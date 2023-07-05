@@ -4,19 +4,31 @@ from micromind import PhiNet
 from micromind.networks.phinet import PhiNetConvBlock, SeparableConv2d
 
 def remove_ModuleList(network, all_layers):
+    """
+    Recursively removes nn.ModuleList layers and adds all other layers to a list.
+
+    :param network (nn.Module): The network or layer to process.
+    :param all_layers (list): List to store all layers.
+    """
 
     for layer in network.children():
-        # if sequential layer, apply recursively to layers in sequential layer
+        # If ModuleList layer, apply recursively to layers in ModuleList layer
         if isinstance(layer, nn.ModuleList):
-            # print(layer)
             remove_ModuleList(layer, all_layers)
         else:  # if leaf node, add it to list
-            # print(layer)
             all_layers.append(layer)
 
 
 def remove_PhiNetConvBlock(cur_layers):
+    """
+    Removes PhiNetConvBlock and SeparableConv2d layers from a list of layers.
 
+    Args:
+        cur_layers (list): List of layers.
+
+    Returns:
+        list: Updated list of layers with PhiNetConvBlock and SeparableConv2d layers removed.
+    """
     all_layers = []
     for layer in cur_layers:
         if isinstance(layer, (PhiNetConvBlock, SeparableConv2d)):
@@ -29,25 +41,34 @@ def remove_PhiNetConvBlock(cur_layers):
     return all_layers
 
 class PhiNet_v2(nn.Module):
-    """MobileNet v1 implementation. This model
+    """PhiNet implementation. This model
     can be instantiated from a pretrained network."""
 
-    def __init__(self, pretrained : str , input_shape = (1, 28, 28), alpha = 0.5, beta = 1, t_zero = 6, num_layers = 4, latent_layer_num = 0, device = "cpu",):
+    def __init__(self, pretrained : str = None, input_shape = (1, 28, 28), alpha = 0.5, beta = 1, t_zero = 6, num_layers = 4, latent_layer_num = 0, device = "cpu",):
         """
-        :param pretrained: boolean indicating whether to load pretrained weights
-        :parm latent_layer_num: determines the number of layers to consider as latent layers
+        Initialize the model.
+
+        :param pretrained: Path to the pretrained model.
+        :param input_shape: Shape of the input data.
+        :param alpha: Alpha parameter for the PhiNetConvBlock.
+        :param beta: Beta parameter for the PhiNetConvBlock.
+        :param t_zero: t_zero parameter for the PhiNetConvBlock.
+        :param num_layers: Number of PhiNetConvBlocks in the model.
+        :param latent_layer_num: Number of layers to keep as latent layers.
+        :param device: Device to use for the model.
+    
         """
         super().__init__()
 
         # Initialize the model
         model = PhiNet(input_shape = input_shape, alpha = alpha, beta = beta, t_zero = t_zero, num_layers = num_layers).to(device)
 
+        print("PhiNet before: ")
+        print(model)
+        print("--------------------------------------------------------------------------------")
         # Load the pretrained weights if available
         if pretrained is not None:
-            unexpected_keys = ["classifier.2.weight", "classifier.2.bias"]
             state_dict = (torch.load(pretrained, map_location=torch.device(device)))
-            for key in unexpected_keys:
-                del state_dict[key]
             model.load_state_dict(state_dict)
 
         all_layers = []
@@ -57,7 +78,7 @@ class PhiNet_v2(nn.Module):
         lat_list = []
         end_list = []
 
-        for i, layer in enumerate(all_layers[:-1]):
+        for i, layer in enumerate(all_layers):
             if i <= latent_layer_num:
                 lat_list.append(layer)
             else:
@@ -78,18 +99,13 @@ class PhiNet_v2(nn.Module):
         if latent_input is not None:
             with torch.no_grad():
                 orig_acts = self.lat_features(orig_acts)
-                #for layers in self.lat_features:
-                #   orig_acts = layers(orig_acts)
             lat_acts = torch.cat((orig_acts, latent_input), 0)
         else:
-            #with torch.no_grad():
-            orig_acts = self.lat_features(orig_acts)
-            #for layers in self.lat_features:
-            #        orig_acts = layers(orig_acts)
+            with torch.no_grad():
+                orig_acts = self.lat_features(orig_acts)
             lat_acts = orig_acts
 
         x = self.end_features(lat_acts)
-        #x = x.view(x.size(0), -1)
         logits = self.output(x)
 
         if return_lat_acts:
@@ -99,9 +115,9 @@ class PhiNet_v2(nn.Module):
     
 if __name__ == "__main__":
 
-    model = PhiNet_v2(latent_layer_num = 2)
-    print("PhiNet:")
+    model = PhiNet_v2(pretrained= "Adam.pth",latent_layer_num = 2)
+    print("PhiNet after: ")
     print(model)
 
     #for name, param in model.named_parameters():
-    #    print(name)
+    #   print(name)

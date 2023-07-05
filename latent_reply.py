@@ -1,16 +1,13 @@
 import torch
-from torch import nn
+from torch.optim import Adam
+import torch.nn.functional as F
 from base_strategy import BaseStrategy
-from torch.utils.data import DataLoader, ConcatDataset
-from avalanche.benchmarks.utils.data_loader import ReplayDataLoader
-from typing import NamedTuple, List, Callable
-from torch import Tensor
-from avalanche.training.utils import freeze_up_to
+from torch.utils.data import DataLoader
 
 
 class LatentReplay(BaseStrategy):
 
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, rm_size, latent_layer_num, freeze_below_layer, lr = 0.01, weight_decay = 0, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, rm_size, lr = 0.01, weight_decay = 0, device = "cpu"):
         """
         Init.
 
@@ -25,6 +22,7 @@ class LatentReplay(BaseStrategy):
         :param storage_policy: storage policy.
         :param device: PyTorch device to run the model.
         """
+
         super().__init__(
             model=model,
             optimizer=optimizer,
@@ -37,11 +35,6 @@ class LatentReplay(BaseStrategy):
 
         self.rm_size = rm_size
         """ Size of the replay memory. """
-        self.latent_layer_num = latent_layer_num
-        """ Number of layers to consider as latent layers. """
-
-        self.freeze_below_layer = freeze_below_layer
-        """ Layer below which the model should be frozen. """
 
         self.train_exp_counter = 0
         """ Number of training experiences so far. """
@@ -67,7 +60,7 @@ class LatentReplay(BaseStrategy):
         for param in self.model.output.parameters():
             param.requires_grad = True
 
-    def make_train_dataloader(self, dataset, shuffle=True, **kwargs):
+    def make_train_dataloader(self, dataset, shuffle = True):
         """
         Called after the dataset instantiation. Initialize the data loader.
 
@@ -85,7 +78,6 @@ class LatentReplay(BaseStrategy):
         batch is equal to the number of iterations required to run an epoch
         on the replay buffer.
 
-        :param num_workers: number of thread workers for the data loading.
         :param shuffle: True if the data should be shuffled, False otherwise.
         """
 
@@ -102,7 +94,6 @@ class LatentReplay(BaseStrategy):
         self.replay_mb_size = max(0, self.train_mb_size - current_batch_mb_size)
         print("replay_mb_size: ", self.replay_mb_size)
 
-        # AR1 only supports SIT scenarios (no task labels).
         dataloader = DataLoader(
             dataset,
             batch_size=current_batch_mb_size,
@@ -121,7 +112,7 @@ class LatentReplay(BaseStrategy):
         self.before_training_exp()
 
         # set the optimizer
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr = self.lr, weight_decay = self.weight_decay)
+        self.optimizer = Adam(self.model.parameters(), lr = self.lr, weight_decay = self.weight_decay)
 
         print("Start of the training process...")
         for exp in dataset:
@@ -131,18 +122,21 @@ class LatentReplay(BaseStrategy):
             #subset_indices = torch.randperm(len(exp.dataset))[:300]
             #train_dataset_subset = torch.utils.data.Subset(exp.dataset, subset_indices)
             #train_loader = self.make_train_dataloader(train_dataset_subset, shuffle=True)
-
+            
+            # Data loader initialization
+            # Called at the start of each learning experience
             train_loader = self.make_train_dataloader(exp.dataset, shuffle=True)
             
-            for epoch in range(self.train_epochs):
-                self.train_exp_epochs = epoch
+            for self.epoch in range(self.train_epochs):
                 self.training_epoch(train_loader)
+                print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%")
+
             self._after_training_exp(exp)
             self.train_exp_counter += 1
 
             print("")
             print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
-            #self.test(dataset)
+            self.test(dataset)
             print("-----------------------------------------------------------------------------------")
 
     def _unpack_minibatch(self):
@@ -153,26 +147,31 @@ class LatentReplay(BaseStrategy):
             self.mbatch[i] = self.mbatch[i].to(self.device)
       
     def training_epoch(self, dataloader):
+        self.train_loss = 0
+        self.correct = 0
+        self.total = 0
+
         for mb_it, self.mbatch in enumerate(dataloader):
+            # Move to device the minibatch
             self._unpack_minibatch()
+
+            # Set the gradients to zero
             self.optimizer.zero_grad()
+
+            # After the first experience, we use the repley buffer
             if self.train_exp_counter > 0:
-                lat_mb_x = self.rm[0][
-                    mb_it
-                    * self.replay_mb_size : (mb_it + 1)
-                    * self.replay_mb_size
-                ]
+                # Sample different minibatch from the replay buffer at every iteration
+                lat_mb_x = self.rm[0][mb_it * self.replay_mb_size : (mb_it + 1) * self.replay_mb_size]
                 lat_mb_x = lat_mb_x.to(self.device)
-                lat_mb_y = self.rm[1][
-                    mb_it
-                    * self.replay_mb_size : (mb_it + 1)
-                    * self.replay_mb_size
-                ]
+                
+                lat_mb_y = self.rm[1][mb_it * self.replay_mb_size : (mb_it + 1) * self.replay_mb_size]
                 lat_mb_y = lat_mb_y.to(self.device)
 
                 lat_task_id = torch.zeros(lat_mb_y.shape[0]).to(self.device)
                 
+                # Concatenate the y minibatch from the replay buffer with the y minibatch from the current experience
                 self.mbatch[1] = torch.cat((self.mbatch[1], lat_mb_y), 0)
+                # Concatenate the task id minibatch from the replay buffer with the task id minibatch from the current experience
                 self.mbatch[2] = torch.cat((self.mbatch[2], lat_task_id), 0)
             else:
                 lat_mb_x = None
@@ -184,7 +183,7 @@ class LatentReplay(BaseStrategy):
                 self.mbatch[0], latent_input=lat_mb_x, return_lat_acts=True
             )
 
-            if self.train_exp_epochs == self.train_epochs-1:
+            if self.epoch == 0:
                 # On the first epoch only: store latent activations. Those
                 # activations will be used to update the replay buffer.
                 lat_acts = lat_acts.detach().clone().cpu()
@@ -192,40 +191,81 @@ class LatentReplay(BaseStrategy):
                     self.cur_acts = lat_acts
                 else:
                     self.cur_acts = torch.cat((self.cur_acts, lat_acts), 0)
+
             # Loss & Backward
-            # We don't need to handle latent replay, as self.mb_y already
-            # contains both current and replay labels.
             self.loss = self.criterion(self.mb_output, self.mbatch[1])
             self.loss.backward()
 
             # Optimization step
             self.optimizer.step()
 
+            # Compute avg loss and accuracy
+            self.loss_accuracy(mb_it)
+
+    def loss_accuracy(self, mb_it):
+        self.train_loss += self.loss.item()
+        self.prob = F.softmax(self.mb_output, dim=1)
+        _, predicted = self.prob.max(1)
+        self.total += self.mbatch[1].size(0)
+        self.correct += predicted.eq(self.mbatch[1]).sum().item()
+
+        if mb_it == len(self.mbatch)-1:
+            self.acc = 100.0 * self.correct / self.total
+            self.avg_loss = self.train_loss / len(self.mbatch)
+
+
     def _after_training_exp(self, exp):
+        # Number of patterns to add to the random memory
         h = min(
             self.rm_size // (self.train_exp_counter + 1),
             self.cur_acts.size(0),
         )
-
+        # Get the current experience
         curr_data = exp.dataset
+
+        # Sample h random patterns from the current experience
         idxs_cur = torch.randperm(self.cur_acts.size(0))[:h]
+        
+        # Get the corresponding labels
         rm_add_y = torch.tensor(
             [curr_data.targets[idx_cur] for idx_cur in idxs_cur]
         )
-
+        # Concatenate the latent activations and the labels
         rm_add = [self.cur_acts[idxs_cur], rm_add_y]
-        print("rm_add[0].shape: ", rm_add[0].shape)
+
+        #print("rm_add[0].shape: ", rm_add[0].shape)
+
         # replace patterns in random memory
         if self.train_exp_counter == 0:
             self.rm = rm_add
         else:
+            # Sample h random patterns from memory to be removed
             idxs_2_replace = torch.randperm(self.rm[0].size(0))[:h]
-            print("HERE")
             for j, idx in enumerate(idxs_2_replace):
                 idx = int(idx)
                 self.rm[0][idx] = rm_add[0][j]
                 self.rm[1][idx] = rm_add[1][j]
-        print("self.rm[0].shape: ", self.rm[0].shape)
+        #print("self.rm[0].shape: ", self.rm[0].shape)
+
+        """
+        if self.train_exp_counter == 0:
+            self.rm = rm_add
+        else:
+            if (len(self.rm[0]) + len(rm_add[0])) > 1500:
+                idxs_2_replace = torch.randperm(self.rm[0].size(0))[:h]
+                for j, idx in enumerate(idxs_2_replace):
+                    idx = int(idx)
+                    self.rm[0][idx] = rm_add[0][j]
+                    self.rm[1][idx] = rm_add[1][j]
+            else:
+                self.rm = [torch.cat((self.rm[0], rm_add[0]), dim=0),
+                       torch.cat((self.rm[1], rm_add[1]), dim=0)] 
+        permutation = torch.randperm(len(self.rm[0]))
+
+        # Apply the permutation to both tensors
+        self.rm[0] = self.rm[0][permutation]
+        self.rm[1] = self.rm[1][permutation]  
+        """
         self.cur_acts = None
 
     def test(self, dataset):
