@@ -73,13 +73,13 @@ class PhiNet_v2(nn.Module):
 
         all_layers = []
         remove_ModuleList(model, all_layers)
-        all_layers = remove_PhiNetConvBlock(all_layers)
+        #all_layers = remove_PhiNetConvBlock(all_layers)
 
         lat_list = []
         end_list = []
 
         for i, layer in enumerate(all_layers):
-            if i <= latent_layer_num:
+            if i < latent_layer_num:
                 lat_list.append(layer)
             else:
                 end_list.append(layer)
@@ -90,8 +90,10 @@ class PhiNet_v2(nn.Module):
         self.output = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(in_features=24,out_features=10, bias=True),
+            nn.Linear(in_features=96,out_features=10, bias=True),
         )
+
+
 
     def forward(self, x, latent_input=None, return_lat_acts=False):
 
@@ -115,9 +117,10 @@ class PhiNet_v2(nn.Module):
     
 if __name__ == "__main__":
 
-    model = PhiNet_v2(pretrained= "Adam.pth",latent_layer_num = 2)
+    model = PhiNet_v2(latent_layer_num = 3)
+    
     print("PhiNet after: ")
     print(model)
-
+    print("--------------------------------------------------------------------------------")
     #for name, param in model.named_parameters():
     #   print(name)

@@ -1,0 +1,5 @@
+Model: PhiNet(input_shape = (1, 28, 28), alpha = 0.5, beta = 1, t_zero = 6,num_layers=7 ,include_top = True, num_classes = 10)
+Adam: lr = 0.01		Weight_Decay = 0
+AdamWeight: lr = 0.01		Weight_Decay = 0.01
+SGD: 	lr = 0.01	momentum = 0
+SGDMomentum: lr = 0.01	momentum = 0.9

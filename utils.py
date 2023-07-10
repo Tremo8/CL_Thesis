@@ -68,7 +68,6 @@ def test(model, criterion, test_loader, device):
 
             outputs = model(images)
             loss = criterion(outputs, labels)
-
             test_loss += loss.item()
             prob = F.softmax(outputs, dim=1)
             _, predicted = prob.max(1)

@@ -60,12 +60,14 @@ class BaseStrategy():
         :param dataset: dataset to test the model.
         """
         print("Starting the testing...")
+        sum = 0
         for exp in dataset:
             print("Testing task ", exp.task_label)
             print('Classes in this task:', exp.classes_in_this_experience)
 
-            experience_dataloader = DataLoader(exp.dataset, batch_size=64, shuffle=False)
+            experience_dataloader = DataLoader(exp.dataset, batch_size=self.eval_mb_size, shuffle=False)
             test_acc, test_loss = utils.test(self.model, self.criterion, experience_dataloader, self.device)
-
+            sum += test_acc
             print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%")
+        print(f"Average accuracy: {sum/len(dataset):.2f}%")
     
