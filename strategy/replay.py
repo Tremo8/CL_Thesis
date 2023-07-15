@@ -1,4 +1,4 @@
-from base_strategy import BaseStrategy
+from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader, ConcatDataset
 from avalanche.benchmarks.utils.data_loader import ReplayDataLoader
 

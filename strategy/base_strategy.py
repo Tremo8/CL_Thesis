@@ -61,6 +61,7 @@ class BaseStrategy():
         """
         print("Starting the testing...")
         sum = 0
+        exps_acc = dict()
         for exp in dataset:
             print("Testing task ", exp.task_label)
             print('Classes in this task:', exp.classes_in_this_experience)
@@ -69,5 +70,8 @@ class BaseStrategy():
             test_acc, test_loss = utils.test(self.model, self.criterion, experience_dataloader, self.device)
             sum += test_acc
             print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%")
-        print(f"Average accuracy: {sum/len(dataset):.2f}%")
+            exps_acc[exp.task_label] = test_acc
+        avg_acc = sum/len(dataset)
+        print(f"Average accuracy: {avg_acc:.2f}%")
+        return exps_acc, avg_acc
     

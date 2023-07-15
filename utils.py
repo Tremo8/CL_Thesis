@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
+import matplotlib.pyplot as plt
 
 def train(model, optimizer, criterion, train_loader, device):
     """
@@ -96,3 +97,21 @@ def concat_experience(data_stream):
         concat_data = ConcatDataset([concat_data, data_stream[i].dataset])
 
     return concat_data
+
+def plot_task_accuracy(task_acc):
+    """
+    Plot the accuracy of each task.
+
+    Args
+        task_acc: A dictionary containing the accuracy of each task.
+    """
+
+    plt.figure(figsize=(10, 5))
+    for key in task_acc.keys():
+        plt.plot(task_acc[key], label=f"Task {key}" , marker='.')
+        plt.xlabel('Task')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.xticks(list(task_acc.keys()))
+    plt.show()
+    

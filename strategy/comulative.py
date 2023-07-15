@@ -1,8 +1,7 @@
-import utils
-from base_strategy import BaseStrategy
-from torch.utils.data import DataLoader
+from strategy.base_strategy import BaseStrategy
+from torch.utils.data import DataLoader, ConcatDataset
 
-class JointTraining(BaseStrategy):
+class Comulative(BaseStrategy):
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, device="cpu"):
         """Init.
 
@@ -31,14 +30,25 @@ class JointTraining(BaseStrategy):
         :param dataset: dataset to train the model.
         """
         print("Start of the training process...")
-        # Concatenate all the experiencess
-        train_set = utils.concat_experience(dataset)
-        
-        # Create the dataloader
-        train_loader = DataLoader(train_set, batch_size=self.train_mb_size, shuffle=True)
-        
-        super().train(train_loader)
-        print("-----------------------------------------------------------------------------------")
+        cumulative_data = None
+        for exp in dataset:
+            print("Training of the experience with class: ", exp.classes_in_this_experience)
+            if cumulative_data is None:
+                # First experience
+                cumulative_data = exp.dataset
+            else:
+                # Concatenate the new dataset with the previous one
+                cumulative_data = ConcatDataset([cumulative_data, exp.dataset])
+
+            # Create the dataloader
+            train_loader = DataLoader(cumulative_data, batch_size=self.train_mb_size, shuffle=True)
+
+            super().train(train_loader)
+            print("")
+            print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
+            self.test(dataset)
+            print("-----------------------------------------------------------------------------------")
+
 
     def test(self, dataset):
         """
