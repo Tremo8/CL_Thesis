@@ -24,7 +24,7 @@ class JointTraining(BaseStrategy):
             device=device,
         )
 
-    def train(self, dataset):
+    def train(self, dataset,test_data = None, plotting = False):
         """
         Training loop.
 
@@ -38,12 +38,22 @@ class JointTraining(BaseStrategy):
         train_loader = DataLoader(train_set, batch_size=self.train_mb_size, shuffle=True)
         
         super().train(train_loader)
+        if test_data is not None:
+            print("")
+            print("Test after the joint training")
+            exps_acc, _ = self.test(test_data)
+            self.update_tasks_acc(exps_acc)
         print("-----------------------------------------------------------------------------------")
-
+        if plotting:
+            utils.plot_task_accuracy(self.tasks_acc)
+            
     def test(self, dataset):
         """
         Testing loop.
 
-        :param dataset: dataset to test the model.
+        :param dataset: dataset to test on.
+
         """
-        super().test(dataset)
+        exps_acc, avg_acc = super().test(dataset)
+            
+        return exps_acc, avg_acc

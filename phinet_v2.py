@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from micromind import PhiNet
 from micromind.networks.phinet import PhiNetConvBlock, SeparableConv2d
+from torchsummary import summary
 
 def remove_ModuleList(network, all_layers):
     """
@@ -71,6 +72,9 @@ class PhiNet_v2(nn.Module):
             state_dict = (torch.load(pretrained, map_location=torch.device(device)))
             model.load_state_dict(state_dict)
 
+        in_features = model._layers[-1]
+        print("in_features: ", in_features)
+
         all_layers = []
         remove_ModuleList(model, all_layers)
         #all_layers = remove_PhiNetConvBlock(all_layers)
@@ -90,7 +94,7 @@ class PhiNet_v2(nn.Module):
         self.output = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(in_features=96,out_features=10, bias=True),
+            nn.Linear(in_features=96, out_features=10, bias=True),
         )
 
 
@@ -118,9 +122,9 @@ class PhiNet_v2(nn.Module):
 if __name__ == "__main__":
 
     model = PhiNet_v2(latent_layer_num = 3)
-    
+    summary(model, (1, 28, 28))
     print("PhiNet after: ")
     print(model)
     print("--------------------------------------------------------------------------------")
-    #for name, param in model.named_parameters():
-    #   print(name)
+    for name, param in model.named_parameters():
+       print(name)

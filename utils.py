@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import ConcatDataset
 import matplotlib.pyplot as plt
+from avalanche.evaluation.metrics import MAC
+import matplotlib.pyplot as plt
 
 def train(model, optimizer, criterion, train_loader, device):
     """
@@ -98,20 +100,59 @@ def concat_experience(data_stream):
 
     return concat_data
 
+def get_MAC(model, input_shape):
+    mac = MAC()
+
+    mac.update(model, input_shape)
+    print(f"MAC: {mac.result()}")
+
+    return mac.result()
+
 def plot_task_accuracy(task_acc):
     """
-    Plot the accuracy of each task.
+    Plot the accuracy of each task and the average accuracy of all tasks encountered so far.
 
-    Args
+    Args:
         task_acc: A dictionary containing the accuracy of each task.
     """
 
-    plt.figure(figsize=(10, 5))
-    for key in task_acc.keys():
-        plt.plot(task_acc[key], label=f"Task {key}" , marker='.')
-        plt.xlabel('Task')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.xticks(list(task_acc.keys()))
-    plt.show()
-    
+    num_tasks = len(task_acc)
+    num_rows = (num_tasks + 1) // 2  # Number of rows in the subplots grid
+    fig, axes = plt.subplots(num_rows, 2, figsize=(10, 5 * num_rows))
+
+    # Flatten the axes array if there is only one row
+    axes = axes.flatten() if num_rows == 1 else axes.ravel()
+
+    # Plot individual task accuracies
+    for idx, (key, ax) in enumerate(zip(task_acc.keys(), axes)):
+        ax.plot(task_acc[key], label=f"Task {key}", marker='.')
+        ax.grid(True)
+        ax.set_xlabel('Task')
+        ax.set_ylabel('Accuracy')
+        ax.set_ylim(0, 100)  # Set y-axis limits
+        ax.set_title(f"Task {key}", loc='center')
+        ax.set_xticks(list(task_acc.keys()))
+
+    averages = []
+    values_count = len(next(iter(task_acc.values())))  # Assuming all lists have the same length
+
+    for i in range(values_count):
+        sum_values = 0
+        for key in task_acc:
+            sum_values += task_acc[key][i]
+
+        average = sum_values / len(task_acc)
+        averages.append(average)
+
+    # Plot average accuracy of all tasks
+    ax = axes[-1]
+    ax.plot(averages, label='Average Accuracy', marker='.')
+    ax.grid(True)
+    ax.set_xlabel('Task')
+    ax.set_ylabel('Accuracy')
+    ax.set_ylim(0, 100)  # Set y-axis limits
+    ax.set_title('Average Accuracy', loc='center')
+    ax.set_xticks(list(task_acc.keys()))
+
+    plt.tight_layout()
+    plt.show()   

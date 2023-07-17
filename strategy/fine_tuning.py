@@ -26,7 +26,7 @@ class FineTuning(BaseStrategy):
 
         self.tasks_acc = {}
 
-    def train(self, dataset):
+    def train(self, dataset, test_data = None, plotting = False):
         """
         Training loop.
 
@@ -40,23 +40,21 @@ class FineTuning(BaseStrategy):
 
             super().train(train_loader)
 
-            print("")
-            print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
-            self.test(dataset, Plotting=True)
+            if test_data is not None:
+                print("")
+                print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
+                exps_acc, _ = self.test(test_data)
+                self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
-
-    def test(self, dataset, Plotting=False):
+            if plotting:
+                utils.plot_task_accuracy(self.tasks_acc)
+    def test(self, dataset):
         """
         Testing loop.
+
+        :param dataset: dataset to test on.
+
         """
         exps_acc, avg_acc = super().test(dataset)
-        if self.tasks_acc:
-            for key in exps_acc.keys():
-                self.tasks_acc[key].append(exps_acc[key])
-        else:
-            for key in exps_acc.keys():
-                self.tasks_acc[key] = [exps_acc[key]]
-                
-        if Plotting:
-            utils.plot_task_accuracy(self.tasks_acc)
-        return exps_acc, avg_acc  
+            
+        return exps_acc, avg_acc

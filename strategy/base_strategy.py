@@ -39,6 +39,9 @@ class BaseStrategy():
         self.device = torch.device(device)
         """ PyTorch device where the model will be allocated. """
 
+        self.tasks_acc = dict()
+        """ Dictionary with the accuracy of each task. """
+
 
     def train(self, dataset):
         """
@@ -58,6 +61,8 @@ class BaseStrategy():
         Testing loop.
 
         :param dataset: dataset to test the model.
+
+        :return: accuracy of each task and average accuracy.
         """
         print("Starting the testing...")
         sum = 0
@@ -73,5 +78,19 @@ class BaseStrategy():
             exps_acc[exp.task_label] = test_acc
         avg_acc = sum/len(dataset)
         print(f"Average accuracy: {avg_acc:.2f}%")
+     
         return exps_acc, avg_acc
+    
+    def update_tasks_acc(self, exps_acc):
+        
+        if self.tasks_acc:
+            for key in exps_acc.keys():
+                self.tasks_acc[key].append(exps_acc[key])
+        else:
+            for key in exps_acc.keys():
+                self.tasks_acc[key] = [exps_acc[key]]
+
+    def get_tasks_acc(self):
+        return self.tasks_acc
+
     
