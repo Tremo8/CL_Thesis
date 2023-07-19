@@ -1,6 +1,7 @@
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader, ConcatDataset
 import utils
+import torch
 
 class Comulative(BaseStrategy):
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, device="cpu"):
@@ -33,13 +34,15 @@ class Comulative(BaseStrategy):
         print("Start of the training process...")
         cumulative_data = None
         for exp in dataset:
+            subset_indices = torch.randperm(len(exp.dataset))[:1500]
+            train_dataset_subset = torch.utils.data.Subset(exp.dataset, subset_indices)
             print("Training of the experience with class: ", exp.classes_in_this_experience)
             if cumulative_data is None:
                 # First experience
-                cumulative_data = exp.dataset
+                cumulative_data = train_dataset_subset
             else:
                 # Concatenate the new dataset with the previous one
-                cumulative_data = ConcatDataset([cumulative_data, exp.dataset])
+                cumulative_data = ConcatDataset([cumulative_data, train_dataset_subset])
 
             # Create the dataloader
             train_loader = DataLoader(cumulative_data, batch_size=self.train_mb_size, shuffle=True)

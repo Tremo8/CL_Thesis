@@ -4,6 +4,7 @@ from torch.utils.data import ConcatDataset
 import matplotlib.pyplot as plt
 from avalanche.evaluation.metrics import MAC
 import matplotlib.pyplot as plt
+from torchinfo import summary
 
 def train(model, optimizer, criterion, train_loader, device):
     """
@@ -27,7 +28,7 @@ def train(model, optimizer, criterion, train_loader, device):
 
     for images, labels, _ in train_loader:
         images, labels = images.to(device), labels.to(device)
-
+        
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -101,12 +102,24 @@ def concat_experience(data_stream):
     return concat_data
 
 def get_MAC(model, input_shape):
-    mac = MAC()
+    """
+    Get the number of multiply-accumulate operations for the given model and input shape.
 
-    mac.update(model, input_shape)
-    print(f"MAC: {mac.result()}")
+    Args:
+        model: The neural network model.
+        input_shape: The shape of the input data.
 
-    return mac.result()
+    Returns:
+        The number of multiply-accumulate operations.
+    """
+    
+    device = next(model.parameters()).device  # Get the device where the model is located
+
+    input_data = torch.zeros([1] + list(input_shape)).to(device)  # Move input_data to the same device as the model
+
+    temp = summary(model, input_data=input_data, verbose=0)
+    return temp.total_mult_adds
+
 
 def plot_task_accuracy(task_acc):
     """
@@ -155,4 +168,44 @@ def plot_task_accuracy(task_acc):
     ax.set_xticks(list(task_acc.keys()))
 
     plt.tight_layout()
-    plt.show()   
+    plt.show()  
+
+def plot_accs(accs):
+    num_tasks = len(next(iter(accs.values())))
+    num_rows = (num_tasks + 1) // 2  # Number of rows in the subplots grid
+    fig, axes = plt.subplots(num_rows, 2, figsize=(10, 5 * num_rows))
+
+    # Flatten the axes array if there is only one row
+    axes = axes.flatten() if num_rows == 1 else axes.ravel()
+
+    for task_key in range(num_tasks):
+        ax = axes[task_key]
+
+        for strategy, strategy_dic in accs.items():
+            ax.plot(strategy_dic[task_key], label=strategy, marker='.')
+
+        ax.grid(True)
+        ax.set_xlabel('Task')
+        ax.set_ylabel('Accuracy')
+        ax.set_ylim(0, 100)  # Set y-axis limits
+        ax.set_title(f"Task {task_key}", loc='center')
+        ax.legend()
+        ax.set_xticks(list(strategy_dic.keys()))
+
+    # Calculate and plot average accuracy of all tasks
+    ax = axes[-1]
+    for strategy, strategy_dic in accs.items():
+        averages = [sum(values) / len(strategy_dic) for values in zip(*strategy_dic.values())]
+        ax.plot(averages, label=strategy, marker='.')
+
+    ax.grid(True)
+    ax.set_xlabel('Task')
+    ax.set_ylabel('Accuracy')
+    ax.set_ylim(0, 100)  # Set y-axis limits
+    ax.set_title('Average Accuracy', loc='center')
+    ax.legend()
+    ax.set_xticks(list(strategy_dic.keys()))
+
+    plt.tight_layout()
+    plt.show()
+

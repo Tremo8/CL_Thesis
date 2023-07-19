@@ -1,6 +1,7 @@
 import utils
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
+import torch
 
 class JointTraining(BaseStrategy):
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, device="cpu"):
@@ -33,7 +34,8 @@ class JointTraining(BaseStrategy):
         print("Start of the training process...")
         # Concatenate all the experiencess
         train_set = utils.concat_experience(dataset)
-        
+        subset_indices = torch.randperm(len(train_set))[:1500]
+        train_dataset_subset = torch.utils.data.Subset(train_set, subset_indices)
         # Create the dataloader
         train_loader = DataLoader(train_set, batch_size=self.train_mb_size, shuffle=True)
         

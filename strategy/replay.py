@@ -2,6 +2,7 @@ from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader, ConcatDataset
 from avalanche.benchmarks.utils.data_loader import ReplayDataLoader
 import utils
+import torch
 
 class Replay(BaseStrategy):
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, storage_policy, device="cpu"):
@@ -60,11 +61,13 @@ class Replay(BaseStrategy):
         for exp in dataset:
             # Print start training of experince exp
             print("Training of the experience with class: ", exp.classes_in_this_experience)
-            train_loader = self.before_training_exp(exp.dataset, shuffle=True)
+            subset_indices = torch.randperm(len(exp.dataset))[:1500]
+            train_dataset_subset = torch.utils.data.Subset(exp.dataset, subset_indices)
+            train_loader = self.before_training_exp(train_dataset_subset, shuffle=True)
 
             super().train(train_loader)
 
-            self.storage_policy.update_from_dataset(exp.dataset)
+            self.storage_policy.update_from_dataset(train_dataset_subset)
             if test_data is not None:
                 print("")
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)

@@ -1,6 +1,7 @@
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
 import utils
+import torch
 
 class FineTuning(BaseStrategy):
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, device="cpu"):
@@ -36,7 +37,9 @@ class FineTuning(BaseStrategy):
         for exp in dataset:
             print("Training of the experience with class: ", exp.classes_in_this_experience)
             # Create the dataloader
-            train_loader = DataLoader(exp.dataset, batch_size=self.train_mb_size, shuffle=True)
+            subset_indices = torch.randperm(len(exp.dataset))[:1500]
+            train_dataset_subset = torch.utils.data.Subset(exp.dataset, subset_indices)
+            train_loader = DataLoader(train_dataset_subset, batch_size=self.train_mb_size, shuffle=True)
 
             super().train(train_loader)
 
