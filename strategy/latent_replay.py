@@ -141,7 +141,10 @@ class LatentReplay(BaseStrategy):
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
             if plotting:
-                utils.plot_task_accuracy(self.tasks_acc)
+                utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+                print("-----------------------------------------------------------------------------------")
+                print("Plot 2")
+                utils.plot_task_accuracy_multiple(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
 
     def _unpack_minibatch(self):
         """Move to device"""

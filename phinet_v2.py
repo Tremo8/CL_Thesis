@@ -62,18 +62,15 @@ class PhiNet_v2(nn.Module):
         super().__init__()
 
         # Initialize the model
-        self.model = PhiNet(input_shape = input_shape, alpha = alpha, beta = beta, t_zero = t_zero, num_layers = num_layers).to(device)
+        model = PhiNet(input_shape = input_shape, alpha = alpha, beta = beta, t_zero = t_zero, num_layers = num_layers).to(device)
 
-        print("PhiNet before: ")
-        print(self.model)
-        print("--------------------------------------------------------------------------------")
         # Load the pretrained weights if available
         if pretrained is not None:
-            state_dict = torch.load(pretrained, map_location=torch.device(device), strict=False)
-            self.model.load_state_dict(state_dict)
+            state_dict = torch.load(pretrained, map_location=torch.device(device))
+            model.load_state_dict(state_dict)
         
         all_layers = []
-        remove_ModuleList(self.model, all_layers)
+        remove_ModuleList(model, all_layers)
         #all_layers = remove_PhiNetConvBlock(all_layers)
 
         lat_list = []
