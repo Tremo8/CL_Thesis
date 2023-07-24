@@ -106,9 +106,6 @@ class LatentReplay(BaseStrategy):
         # Freeze the model up to the latent layers
         self.before_training_exp()
 
-        print("AFTER PhiNet: ")
-        print(self.model)
-
         print("Start of the training process...")
         for exp in dataset:
             print("Training of the experience with class: ", exp.classes_in_this_experience)
@@ -130,8 +127,6 @@ class LatentReplay(BaseStrategy):
             # Update the memory
             self.update_mem_after_exp(exp)
 
-            # Old method to update the memory
-            #self._after_training_exp(exp)
             self.train_exp_counter += 1
                 
             if test_data is not None:
@@ -141,10 +136,10 @@ class LatentReplay(BaseStrategy):
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
             if plotting:
-                utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-                print("-----------------------------------------------------------------------------------")
-                print("Plot 2")
-                utils.plot_task_accuracy_multiple(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+                #utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+                plotter = utils.TaskAccuracyPlotter()
+                _ = plotter.plot_task_accuracy(self.tasks_acc, label = "A", plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+                plotter.show_figures()
 
     def _unpack_minibatch(self):
         """Move to device"""
@@ -254,29 +249,7 @@ class LatentReplay(BaseStrategy):
 
         # Concatenate the latent activations and the labels
         rm_add = [self.cur_acts[idxs_cur], rm_add_y]
-        """
-        # replace patterns in random memory
-        if self.train_exp_counter == 0:
-            self.rm = dict()
-            self.rm[exp.current_experience] = rm_add
-        else:
-            sum_length = 0
-            for rm_exp in self.rm.values():
-                # Compute the length of each list and add it to the sum_length
-                sum_length += len(rm_exp[0])
 
-            if (sum_length + len(rm_add[0])) <= self.rm_size:
-                self.rm[exp.current_experience] = rm_add
-            else:
-                # Iterate over the dictionary items
-                for key, value in self.rm.items():
-                    perm = torch.randperm(value[0].size(0))
-                    temp = value[0][perm]
-                    value[0] = temp[0:h]
-                    temp = value[1][perm]
-                    value[1] = temp[0:h]
-                self.rm[exp.current_experience] = rm_add
-        """
         if self.train_exp_counter == 0:
             self.rm = {exp.current_experience: rm_add}
         else:

@@ -19,33 +19,23 @@ def remove_ModuleList(network, all_layers):
         else:  # if leaf node, add it to list
             all_layers.append(layer)
 
-
-def remove_PhiNetConvBlock(cur_layers):
+def get_output_shape(model):
     """
-    Removes PhiNetConvBlock and SeparableConv2d layers from a list of layers.
+    Get the output shape of a model.
 
-    Args:
-        cur_layers (list): List of layers.
+    :param model (nn.Module): The model to get the output shape of.
 
-    Returns:
-        list: Updated list of layers with PhiNetConvBlock and SeparableConv2d layers removed.
+    :return: The output shape of the model.
     """
-    all_layers = []
-    for layer in cur_layers:
-        if isinstance(layer, (PhiNetConvBlock, SeparableConv2d)):
-            for ch in layer.children():
-                if isinstance(ch, nn.ModuleList):
-                    ch = nn.Sequential(*ch)
-                all_layers.append(ch)
-        else:
-            all_layers.append(layer)
-    return all_layers
+    device = next(model.parameters()).device 
+    model.eval()
+    return model(torch.rand(1, *model.input_shape).to(device)).shape[1]
 
-class PhiNet_v2(nn.Module):
+class PhiNetV3(nn.Module):
     """PhiNet implementation. This model
     can be instantiated from a pretrained network."""
 
-    def __init__(self, pretrained : str = None, input_shape = (1, 28, 28), alpha = 0.5, beta = 1, t_zero = 6, num_layers = 4, latent_layer_num = 0, device = "cpu",):
+    def __init__(self, model, latent_layer_num = 0, out_features = 10, device = "cpu",):
         """
         Initialize the model.
 
@@ -60,18 +50,9 @@ class PhiNet_v2(nn.Module):
     
         """
         super().__init__()
-
-        # Initialize the model
-        model = PhiNet(input_shape = input_shape, alpha = alpha, beta = beta, t_zero = t_zero, num_layers = num_layers).to(device)
-
-        # Load the pretrained weights if available
-        if pretrained is not None:
-            state_dict = torch.load(pretrained, map_location=torch.device(device))
-            model.load_state_dict(state_dict)
         
         all_layers = []
         remove_ModuleList(model, all_layers)
-        #all_layers = remove_PhiNetConvBlock(all_layers)
 
         lat_list = []
         end_list = []
@@ -88,7 +69,7 @@ class PhiNet_v2(nn.Module):
         self.output = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(in_features=96, out_features=10, bias=True),
+            nn.Linear(in_features=get_output_shape(model), out_features=out_features, bias=True),
         )
 
     def forward(self, x, latent_input=None, return_lat_acts=False):
@@ -112,10 +93,21 @@ class PhiNet_v2(nn.Module):
             return logits
     
 if __name__ == "__main__":
-
-    model = PhiNet_v2(latent_layer_num = 3)
+    #model = PhiNet((3,32,32), alpha=0.5, beta=1, t_zero=6, num_layers=5, include_top=False)
+    model = PhiNet.from_pretrained("CIFAR-10", 3.0, 0.75, 6.0, 7, 160, classifier=False)
+    print("PhiNet before: ")
+    print(model)
     print("--------------------------------------------------------------------------------")
+    print("--------------------------------------------------------------------------------")
+    m = PhiNetV3(model, latent_layer_num = 3)
+    print("PhiNet after: ")
+    print(m)
+
+    """
+    summary(model, (1, 28, 28))
     print("PhiNet after: ")
     print(model)
-    
-    
+    print("--------------------------------------------------------------------------------")
+    for name, param in model.named_parameters():
+       print(name)
+    """
