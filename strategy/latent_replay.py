@@ -6,6 +6,7 @@ from memory_computation import total_size
 import utils
 import sys
 from torchinfo import summary
+import numpy as np
 
 class LatentReplay(BaseStrategy):
 
@@ -133,6 +134,16 @@ class LatentReplay(BaseStrategy):
                 print("")
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
                 exps_acc, _ = self.test(test_data)
+                # Get the first self.train_exp_counter keys
+                first_keys = list(exps_acc.keys())[:self.train_exp_counter]
+
+                # Calculate the sum of the values corresponding to the first keys
+                sum_of_first_values = sum(exps_acc[key] for key in first_keys)
+
+                # Calculate the average
+                average = sum_of_first_values / self.train_exp_counter
+                print(f"Average accuracy of the encutered tasks: {average:.2f}%")
+
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
         if plotting:
@@ -140,6 +151,8 @@ class LatentReplay(BaseStrategy):
             plotter = utils.TaskAccuracyPlotter()
             _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
             plotter.show_figures()
+            
+        print(f"Size of the replay memory: {self.get_dict_size() / 1048576 :.2f} KB")
 
     def _unpack_minibatch(self):
         """Move to device"""
@@ -263,19 +276,25 @@ class LatentReplay(BaseStrategy):
                     value[1] = value[1][perm][0:h]
                 self.rm[exp.current_experience] = rm_add
 
-
-        print("Size of the replay memory: ", self.get_dict_size())
-        print("Size of the replay memory 2: ", total_size(self.rm), " MB")
-
         self.cur_acts = None
         self.cur_acts_y = None
 
+    def get_tensor_size(self, tensor):
+        if isinstance(tensor, np.ndarray):
+            return tensor.nbytes
+        elif isinstance(tensor, torch.Tensor):
+            return tensor.element_size() * tensor.numel()
+        else:
+            return sys.getsizeof(tensor)
+
     def get_dict_size(self):
-        total_size = sys.getsizeof(self.rm)
+        #tot_size = sys.getsizeof(self.rm)
+        tot_size = total_size(self.rm)
         for value in self.rm.values():
-            total_size += sys.getsizeof(value[0])
-            total_size += sys.getsizeof(value[1])
-        return total_size
+            tot_size += self.get_tensor_size(value[0])
+            tot_size += self.get_tensor_size(value[1])
+        return tot_size
+
 
     def test(self, dataset):
         """

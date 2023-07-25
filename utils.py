@@ -5,6 +5,8 @@ from torch.utils.data import ConcatDataset
 
 import numpy as np
 
+import matplotlib
+matplotlib.use('Qt5Agg')  # or 'TkAgg' or any other backend that supports GUI
 import matplotlib.pyplot as plt
 
 from avalanche.models.batch_renorm import BatchRenorm2D
