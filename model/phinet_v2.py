@@ -3,7 +3,7 @@ import torch.nn as nn
 from micromind import PhiNet
 from micromind.networks.phinet import PhiNetConvBlock, SeparableConv2d
 from torchsummary import summary
-
+import utils
 def remove_ModuleList(network, all_layers):
     """
     Recursively removes nn.ModuleList layers and adds all other layers to a list.
@@ -57,7 +57,7 @@ class PhiNet_v2(nn.Module):
     """PhiNet implementation. This model
     can be instantiated from a pretrained network."""
 
-    def __init__(self, pretrained : str = None, input_shape = (1, 28, 28), out_features = 10, alpha = 0.5, beta = 1, t_zero = 6, num_layers = 4, latent_layer_num = 0, device = "cpu",):
+    def __init__(self, pretrained : str = None, input_shape = (1, 28, 28), out_features = 10, alpha = 0.5, beta = 1, t_zero = 6, num_layers = 4, latent_layer_num = 0, replace_bn_with_brn = False, device = "cpu",):
         """
         Initialize the model.
 
@@ -81,6 +81,8 @@ class PhiNet_v2(nn.Module):
             state_dict = torch.load(pretrained, map_location=torch.device(device))
             model.load_state_dict(state_dict)
         
+        if replace_bn_with_brn:
+            utils.replace_bn_with_brn(model)
         all_layers = []
         remove_ModuleList(model, all_layers)
         #all_layers = remove_PhiNetConvBlock(all_layers)

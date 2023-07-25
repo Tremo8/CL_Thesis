@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from memory_computation import total_size
 import utils
 import sys
-
+from torchinfo import summary
 
 class LatentReplay(BaseStrategy):
 
@@ -135,11 +135,11 @@ class LatentReplay(BaseStrategy):
                 exps_acc, _ = self.test(test_data)
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
-            if plotting:
-                #utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-                plotter = utils.TaskAccuracyPlotter()
-                _ = plotter.plot_task_accuracy(self.tasks_acc, label = "A", plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-                plotter.show_figures()
+        if plotting:
+            #utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+            plotter = utils.TaskAccuracyPlotter()
+            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+            plotter.show_figures()
 
     def _unpack_minibatch(self):
         """Move to device"""

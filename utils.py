@@ -1,16 +1,13 @@
-import time
-
 import torch
 import torch.nn.functional as F
+from torch.nn import Module, BatchNorm2d
 from torch.utils.data import ConcatDataset
-
-from torchinfo import summary
 
 import numpy as np
 
 import matplotlib.pyplot as plt
 
-from avalanche.evaluation.metrics import MAC
+from avalanche.models.batch_renorm import BatchRenorm2D
 
 def train(model, optimizer, criterion, train_loader, device):
     """
@@ -106,25 +103,46 @@ def concat_experience(data_stream):
         concat_data = ConcatDataset([concat_data, data_stream[i].dataset])
 
     return concat_data
-
-def get_MAC(model, input_shape):
+            
+# momentum=0.1, r_d_max_inc_step=0.0001, max_r_max=3.0, max_d_max=5.0
+def replace_bn_with_brn(m: Module, momentum=0.00005, r_d_max_inc_step=0,
+                        r_max=1.0, d_max=0.0, max_r_max=1.25, max_d_max=0.5):
     """
-    Get the number of multiply-accumulate operations for the given model and input shape.
+    Recursively replace all instances of BatchNorm2d with BatchRenorm2d.
 
     Args:
-        model: The neural network model.
-        input_shape: The shape of the input data.
-
-    Returns:
-        The number of multiply-accumulate operations.
+        m: The module to be transformed.
+        momentum: The momentum for the running mean and variance.
+        r_d_max_inc_step: The step size for increasing r_max and d_max.
+        r_max: The maximum value for r_max.
+        d_max: The maximum value for d_max.
+        max_r_max: The maximum value for the maximum value of r_max.
+        max_d_max: The maximum value for the maximum value of d_max.
     """
-    
-    device = next(model.parameters()).device  # Get the device where the model is located
 
-    input_data = torch.zeros([1] + list(input_shape)).to(device)  # Move input_data to the same device as the model
-
-    temp = summary(model, input_data=input_data, verbose=0)
-    return temp.total_mult_adds
+    for name, child_module in m.named_children():
+        if isinstance(child_module, torch.nn.BatchNorm2d):
+            setattr(
+                m,
+                name,
+                BatchRenorm2D(
+                    child_module.num_features,
+                    gamma=child_module.weight,
+                    beta=child_module.bias,
+                    running_mean=child_module.running_mean,
+                    running_var=child_module.running_var,
+                    eps=child_module.eps,
+                    momentum=momentum,
+                    r_d_max_inc_step=r_d_max_inc_step,
+                    r_max=r_max,
+                    d_max=d_max,
+                    max_r_max=max_r_max,
+                    max_d_max=max_d_max,
+                ),
+            )
+        else:
+            replace_bn_with_brn(child_module, momentum, r_d_max_inc_step,
+                                r_max, d_max, max_r_max, max_d_max)
 
 def plot_individual_task_accuracy(task_acc):
     """
@@ -263,6 +281,10 @@ def plot_accs(accs):
     plt.show()
 
 class TaskAccuracyPlotter:
+    """
+    Class for plotting the accuracy of each task, the average accuracy of all tasks, and the average accuracy of only encountered tasks.
+    """
+
     def __init__(self):
         self.fig1 = None
         self.fig2 = None
@@ -299,7 +321,7 @@ class TaskAccuracyPlotter:
             ax.set_ylim(-1, 101)  # Set y-axis limits
             ax.set_title(f"Task {key}", loc='center')
             ax.set_xticks(list(task_acc.keys()))
-            ax.legend()
+            ax.legend() if ax.get_legend_handles_labels()[1] else None
             plot_num += 1
 
         # Remove any unused subplots if num_tasks is odd
@@ -336,7 +358,7 @@ class TaskAccuracyPlotter:
         ax.set_ylim(-1, 101)
         ax.set_xticks(list(task_acc.keys()))
         ax.set_title('Average Accuracy')
-        ax.legend()
+        ax.legend() if ax.get_legend_handles_labels()[1] else None
 
         plt.tight_layout()
 
@@ -380,7 +402,7 @@ class TaskAccuracyPlotter:
         ax.set_ylim(-1, 101)
         ax.set_xticks(list(task_acc.keys()))
         ax.set_title('Average Accuracy of Encountered Tasks')
-        ax.legend()
+        ax.legend() if ax.get_legend_handles_labels()[1] else None
 
         plt.tight_layout()
 
@@ -405,9 +427,13 @@ class TaskAccuracyPlotter:
 
         Args:
             task_acc (dict): A dictionary containing the accuracy of each task.
+            label (str, optional): Label for the current plot.
             plot_task_acc (bool): Whether to plot individual task accuracies. Default is True.
             plot_avg_acc (bool): Whether to plot average accuracy of all tasks. Default is True.
             plot_encountered_avg (bool): Whether to plot average accuracy of only encountered tasks. Default is True.
+
+        Returns:
+            matplotlib.figure.Figure: The figure containing the plot.
         """
         self.label = label
         
@@ -419,141 +445,3 @@ class TaskAccuracyPlotter:
             fig3 = self.plot_encountered_tasks_accuracy(task_acc)
 
         return self.fig1, self.fig2, self.fig3
-
-def measure_inference_time(input_shape, model, device):
-    """
-    Measure the inference time of the given model.
-
-    Args:
-        input_shape: The shape of the input data.
-        model: The neural network model.
-        device: The device to perform the computations on (e.g., CPU or GPU).
-
-    Returns:
-        The average inference time in milliseconds.
-    """
-
-    dummy_input = torch.randn(1, *input_shape, dtype=torch.float).to(device)
-    
-    # MODEL TO EVAL MODE
-    model.eval()
-    
-    # GPU/CPU-WARM-UP
-    for _ in range(10):
-        _ = model(dummy_input)
-
-    # MEASURE PERFORMANCE
-    repetitions = 300
-    timings = []
-    with torch.no_grad():
-        if device.type == 'cuda':
-            starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-            for rep in range(repetitions):
-                starter.record()
-                _ = model(dummy_input)
-                ender.record()
-                torch.cuda.synchronize()
-                curr_time = starter.elapsed_time(ender)
-                timings.append(curr_time)
-        else:  # CPU
-            for rep in range(repetitions):
-                start_time = time.time()
-                _ = model(dummy_input)
-                end_time = time.time()
-                elapsed_time = (end_time - start_time) * 1000.0  # Convert to milliseconds
-                timings.append(elapsed_time)
-
-    mean_syn = np.mean(timings)
-    std_syn = np.std(timings)
-
-    print(f"Average inference time: {mean_syn:.3f} +/- {std_syn:.3f} ms")
-
-    return mean_syn
-
-def plot_task_accuracy_multiple(task_acc_list, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True):
-    """
-    Plot the accuracy of each task, the average accuracy of all tasks, and the average accuracy of only encountered tasks
-    for multiple dictionaries.
-
-    Args:
-        task_acc_list (list): A list of dictionaries, each containing the accuracy of each task.
-        plot_task_acc (bool): Whether to plot individual task accuracies. Default is True.
-        plot_avg_acc (bool): Whether to plot average accuracy of all tasks. Default is True.
-        plot_encountered_avg (bool): Whether to plot average accuracy of only encountered tasks. Default is True.
-    """
-    def plot_individual_task_accuracy(task_acc_list):
-        num_tasks = max(len(d) for d in task_acc_list)
-        num_rows = (num_tasks + 1) // 2  # Number of rows in the subplots grid
-        fig, axes = plt.subplots(num_rows, 2, figsize=(15, 5 * num_rows))
-        axes = axes.flatten()
-        plot_num = 0
-
-        for idx, (key, ax) in enumerate(zip(range(0, num_tasks), axes)):
-            for i, task_acc in enumerate(task_acc_list):
-                if key in task_acc:
-                    ax.plot(task_acc[key], label=f"Task {key} (Dict {i + 1})", marker='.')
-            ax.grid(True)
-            ax.set_xlabel('Task')
-            ax.set_ylabel('Accuracy')
-            ax.set_yticks(np.arange(0, 101, 5))
-            ax.set_ylim(-1, 101)  # Set y-axis limits
-            ax.set_title(f"Task {key}", loc='center')
-            ax.set_xticks(range(1, num_tasks + 1))
-            plot_num += 1
-
-        # Remove any unused subplots if num_tasks is odd
-        for i in range(num_tasks, num_rows * 2):
-            fig.delaxes(axes[i])
-        plt.tight_layout()
-        plt.legend()
-        plt.show()
-
-    def plot_average_accuracy(task_acc_list):
-        num_tasks = max(len(d) for d in task_acc_list)
-        for i, task_acc in enumerate(task_acc_list):
-            averages = [sum(values) / num_tasks for values in zip(*task_acc.values())]
-            plt.plot(averages, label=f"Dict {i + 1}", marker='.')
-        plt.grid(True)
-        plt.xlabel('Task')
-        plt.ylabel('Accuracy')
-        plt.yticks(np.arange(0, 101, 5))
-        plt.ylim(-1, 101)
-        plt.xticks(range(1, num_tasks + 1))
-        plt.title('Average Accuracy')
-        plt.legend()
-        plt.show()
-
-    def plot_encountered_tasks_accuracy(task_acc_list):
-        num_tasks = max(len(d) for d in task_acc_list)
-        for i, task_acc in enumerate(task_acc_list):
-            encountered_averages = []
-            for last_key in range(max(len(next(iter(task_acc.values()))), num_tasks)):
-                total_last_element = 0
-                num_keys = 0
-
-                for key, value in task_acc.items():
-                    if int(key) <= int(last_key):
-                        last_element = value[int(last_key)]
-                        total_last_element += last_element
-                        num_keys += 1
-
-                avg = total_last_element / num_keys if num_keys > 0 else 0
-                encountered_averages.append(avg)
-
-            plt.plot(range(1, len(encountered_averages) + 1), encountered_averages, label=f"Dict {i + 1}", marker='.')
-        plt.grid(True)
-        plt.xlabel('Task')
-        plt.ylabel('Accuracy')
-        plt.yticks(np.arange(0, 101, 5))
-        plt.ylim(-1, 101)
-        plt.xticks(range(1, num_tasks + 1))
-        plt.title('Average Accuracy of Encountered Tasks')
-        plt.legend()
-        plt.show()
-
-    if plot_task_acc:
-        plot_individual_task_accuracy(task_acc_list)
-    if plot_avg_acc:
-        plot_average_accuracy(task_acc_list)
-    if plot_encountered_avg:
-        plot_encountered_tasks_accuracy(task_acc_list)
