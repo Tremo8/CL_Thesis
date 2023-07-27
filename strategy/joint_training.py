@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 import torch
 
 class JointTraining(BaseStrategy):
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu"):
         """Init.
 
         :param model: PyTorch model.
@@ -22,6 +22,8 @@ class JointTraining(BaseStrategy):
             train_mb_size=train_mb_size,
             train_epochs=train_epochs,
             eval_mb_size=eval_mb_size,
+            split_ratio = split_ratio,         
+            patience = patience,
             device=device,
         )
 
@@ -33,13 +35,19 @@ class JointTraining(BaseStrategy):
         """
         print("Start of the training process...")
         # Concatenate all the experiencess
-        train_set = utils.concat_experience(dataset)
-        subset_indices = torch.randperm(len(train_set))[:1500]
-        train_dataset_subset = torch.utils.data.Subset(train_set, subset_indices)
+        concat_set = utils.concat_experience(dataset)
         # Create the dataloader
-        train_loader = DataLoader(train_set, batch_size=self.train_mb_size, shuffle=True)
-        
-        super().train(train_loader)
+        if self.split_ratio != 0:
+            train_dataset, val_dataset = utils.split_dataset(concat_set, split_ratio=self.split_ratio)
+            print("Train dataset size: ", len(train_dataset))
+            print("Validation dataset size: ", len(val_dataset))
+            train_loader = DataLoader(train_dataset, batch_size=self.train_mb_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True)
+        else:
+            train_loader = DataLoader(concat_set, batch_size=self.train_mb_size, shuffle=True)
+            val_loader = None
+
+        super().train(train_loader, val_loader)
         if test_data is not None:
             print("")
             print("Test after the joint training")
@@ -47,7 +55,9 @@ class JointTraining(BaseStrategy):
             self.update_tasks_acc(exps_acc)
         print("-----------------------------------------------------------------------------------")
         if plotting:
-            utils.plot_task_accuracy(self.tasks_acc)
+            plotter = utils.TaskAccuracyPlotter()
+            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+            plotter.show_figures()
             
     def test(self, dataset):
         """

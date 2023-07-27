@@ -5,7 +5,7 @@ import utils
 import torch
 
 class Replay(BaseStrategy):
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, storage_policy, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, storage_policy, split_ratio = 0, patience = 5, device="cpu"):
         """
         Init.
 
@@ -25,6 +25,8 @@ class Replay(BaseStrategy):
             train_mb_size=train_mb_size,
             train_epochs=train_epochs,
             eval_mb_size=eval_mb_size,
+            split_ratio = split_ratio,
+            patience=patience,
             device=device,
         )
 
@@ -61,13 +63,19 @@ class Replay(BaseStrategy):
         for exp in dataset:
             # Print start training of experince exp
             print("Training of the experience with class: ", exp.classes_in_this_experience)
-            subset_indices = torch.randperm(len(exp.dataset))[:1500]
-            train_dataset_subset = torch.utils.data.Subset(exp.dataset, subset_indices)
-            train_loader = self.before_training_exp(train_dataset_subset, shuffle=True)
+            if self.split_ratio != 0:
+                train_dataset, val_dataset = utils.split_dataset(exp.dataset, split_ratio=self.split_ratio)
+                print("Train dataset size: ", len(train_dataset))
+                print("Validation dataset size: ", len(val_dataset))
+                val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True)
+            else:
+                train_dataset = exp.dataset
+                val_loader = None
+            train_loader = self.before_training_exp(train_dataset, shuffle=True)
 
-            super().train(train_loader)
+            super().train(train_loader, val_loader)
 
-            self.storage_policy.update_from_dataset(train_dataset_subset)
+            self.storage_policy.update_from_dataset(train_dataset)
             if test_data is not None:
                 print("")
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)

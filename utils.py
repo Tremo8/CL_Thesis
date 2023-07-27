@@ -1,12 +1,11 @@
 import torch
 import torch.nn.functional as F
 from torch.nn import Module, BatchNorm2d
-from torch.utils.data import ConcatDataset
+from torch.utils.data import ConcatDataset, random_split
 
 import numpy as np
 
 import matplotlib
-matplotlib.use('Qt5Agg')  # or 'TkAgg' or any other backend that supports GUI
 import matplotlib.pyplot as plt
 
 from avalanche.models.batch_renorm import BatchRenorm2D
@@ -88,6 +87,29 @@ def test(model, criterion, test_loader, device):
 
     return accuracy, average_loss
 
+def split_dataset(dataset, split_ratio=0.8):
+    """
+    Split the dataset into train and validation sets using random_split.
+
+    Args:
+        dataset (torch.utils.data.Dataset): The dataset to be split.
+        split_ratio (float): The ratio of the dataset to be used for training. (default: 0.8)
+
+    Returns:
+        torch.utils.data.Dataset: Training dataset.
+        torch.utils.data.Dataset: Validation dataset.
+    """
+    # Calculate the size of the training dataset based on the split_ratio
+    train_size = int(len(dataset) * split_ratio)
+
+    # Calculate the size of the validation dataset
+    val_size = len(dataset) - train_size
+
+    # Use random_split to split the dataset
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+    return train_dataset, val_dataset
+
 def concat_experience(data_stream):
     """
     Concatenate multiple datasets into a single dataset.
@@ -104,7 +126,10 @@ def concat_experience(data_stream):
     for i in range(1, len(data_stream)):
         concat_data = ConcatDataset([concat_data, data_stream[i].dataset])
 
-    return concat_data
+    shuffled_indices = torch.randperm(len(concat_data))
+    shuffled_dataset = torch.utils.data.Subset(concat_data, shuffled_indices)
+    
+    return shuffled_dataset.dataset
             
 # momentum=0.1, r_d_max_inc_step=0.0001, max_r_max=3.0, max_d_max=5.0
 def replace_bn_with_brn(m: Module, momentum=0.00005, r_d_max_inc_step=0,

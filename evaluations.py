@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import torch
-from torchsummary import summary
+from torchinfo import summary
 
 def measure_inference_time(model, input_shape):
     """

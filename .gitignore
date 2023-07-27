@@ -1,5 +1,6 @@
 # Ignore data directories
-/data/*
+data/*
 
-# Ignore test file
-/PlotClass.jpynb
+# Ignore notebooks checkpoints
+PlotClass.ipynb
+checkpoint.pt

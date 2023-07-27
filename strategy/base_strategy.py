@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.optim as optim
 import utils
 from torch.utils.data import DataLoader
+from pytorchtools import EarlyStopping
 
 class BaseStrategy():
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu"):
         """Init.
 
         :param model: PyTorch model.
@@ -42,18 +43,31 @@ class BaseStrategy():
         self.tasks_acc = dict()
         """ Dictionary with the accuracy of each task. """
 
+        self.early_stopping = EarlyStopping(patience=patience, verbose=2)
+        """ Early stopping. """
 
-    def train(self, dataset):
+        self.split_ratio = split_ratio
+        """ Ratio to split the dataset into training and validation. """
+
+
+    def train(self, train_loader, valid_loader = None):
         """
         Training loop.
 
         :param dataset: dataset to train the model.
 
         """
+        
         for epoch in range(self.train_epochs):
-            train_acc, train_loss = utils.train(self.model, self.optimizer, self.criterion, dataset, self.device)
+            train_acc, train_loss = utils.train(self.model, self.optimizer, self.criterion, train_loader, self.device)
 
             print(f"Epoch: {epoch+1}/{self.train_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.2f}%")
+            if valid_loader is not None:
+                early_stopped = self.validate_and_early_stop(valid_loader)
+                if early_stopped:
+                    self.early_stopping.reset_counter()
+                    print("Early stopping")
+                    break
     
 
     def test(self, dataset):
@@ -80,6 +94,23 @@ class BaseStrategy():
         print(f"Average accuracy: {avg_acc:.2f}%")
      
         return exps_acc, avg_acc
+    
+    def validate_and_early_stop(self, valid_loader):
+        """
+        Validate the model and check if early stopping condition is met.
+        
+        :param valid_loader: validation data loader.
+        
+        :return: flag indicating whether early stopping condition is met or not.
+        """
+
+        _, valid_loss = utils.test(self.model, self.criterion, valid_loader, self.device)
+        # early_stopping needs the validation loss to check if it has decreased, 
+        # and if it has, it will make a checkpoint of the current model
+        self.early_stopping(valid_loss, self.model)
+        
+        # Return a flag indicating whether early stopping condition is met or not
+        return self.early_stopping.early_stop
     
     def update_tasks_acc(self, exps_acc):
         

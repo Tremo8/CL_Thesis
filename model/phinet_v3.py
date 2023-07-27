@@ -101,17 +101,6 @@ if __name__ == "__main__":
     model = PhiNet.from_pretrained("CIFAR-10", 3.0, 0.75, 6.0, 7, 160, classifier=False)
     print("PhiNet before: ")
     print(model)
-    print("--------------------------------------------------------------------------------")
-    print("--------------------------------------------------------------------------------")
     m = PhiNetV3(model, latent_layer_num = 3)
     print("PhiNet after: ")
     print(m)
-
-    """
-    summary(model, (1, 28, 28))
-    print("PhiNet after: ")
-    print(model)
-    print("--------------------------------------------------------------------------------")
-    for name, param in model.named_parameters():
-       print(name)
-    """
