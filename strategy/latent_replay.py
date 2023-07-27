@@ -2,28 +2,32 @@ import torch
 import torch.nn.functional as F
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
-from memory_computation import total_size
-import utils
+from utility.memory_computation import total_size
+import utility.utils as utils
 import sys
 from torchinfo import summary
 import numpy as np
 
 class LatentReplay(BaseStrategy):
-
+    """ Latent replay strategy. """
     def __init__(self, model, optimizer, criterion, train_epochs, train_mb_size = 21, replay_mb_size = 107,  eval_mb_size = 128, rm_size = 1500, manual_mb = True, split_ratio = 0, patience = 5, device = "cpu"):
-        """
-        Init.
+        """Init.
 
-        :param model: PyTorch model.
-        :param optimizer: PyTorch optimizer.
-        :param criterion: loss function.
-        :param train_epochs: number of training epochs.
-        :param train_mb_size: mini-batch size for training.
-        :param replay_mb_size: mini-batch size for replay buffer.
-        :param eval_mb_size: mini-batch size for eval.
-        :param rm_size: size of the replay memory.
-        :param manual_mb: If True the mini-batch size should be manually setted. If False it computes the mini-batch.
-        :param device: PyTorch device to run the model.
+        Args:
+            model: PyTorch model.
+            optimizer: PyTorch optimizer.
+            criterion: PyTorch criterion.
+            train_mb_size: training mini-batch size.
+            train_epochs: number of training epochs.
+            replay_mb_size: replay mini-batch size.
+            eval_mb_size: evaluation mini-batch size.
+            rm_size: size of the replay memory.
+            manual_mb: If True the mini-batch size should be manually setted. If False it computes the mini-batch size
+            as `len(train_dataset) // ( ( len(train_dataset) + len(replay_buffer) ) // train_mb_size )` and the memory
+            mini-batch size as `train_mb_size - replay_mb_size`.
+            split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
+            patience: patience for early stopping.
+            device: PyTorch device where the model will be allocated.
         """
 
         super().__init__(
@@ -74,11 +78,15 @@ class LatentReplay(BaseStrategy):
         """
         Called after the dataset instantiation. Initialize the data loader.
 
-        :param dataset: The dataset to instantiate the data loader.
-        :param manual_mb: If True the mini-batch size should be manually setted. If False it computes the mini-batch
-        size as `len(train_dataset) // ( ( len(train_dataset) + len(replay_buffer) ) // train_mb_size )` and the memory
-        mini-batch size as `train_mb_size - replay_mb_size`.
-        :param shuffle: True if the data should be shuffled, False otherwise.
+        Args:
+            dataset: dataset to train the model.
+            manual_mb: If True the mini-batch size should be manually setted. If False it computes the mini-batch size
+            as `len(train_dataset) // ( ( len(train_dataset) + len(replay_buffer) ) // train_mb_size )` and the memory
+            mini-batch size as `train_mb_size - replay_mb_size`.
+            shuffle: If True the data loader has to shuffle the dataset at each epoch.
+
+        Returns:
+            The data loader.
         """
         current_batch_mb_size = self.train_mb_size
 
@@ -100,10 +108,12 @@ class LatentReplay(BaseStrategy):
 
     def train(self, dataset, test_data = None, plotting = False):
         """
-        Training loop.
+        Training loop over the experiences.
 
-        :param dataset: dataset to train the model.
-        :param test_data: dataset to test the model. If None, the test phase is skipped.
+        Args:
+            dataset: dataset containing the experiences.
+            test_data: test dataset.
+            plotting: If True, the training history is plotted at the end of the training process.
         """
         
         # Freeze the model up to the latent layers
@@ -179,6 +189,12 @@ class LatentReplay(BaseStrategy):
             self.mbatch[i] = self.mbatch[i].to(self.device)
       
     def training_epoch(self, dataloader):
+        """
+        Training epoch over the current experience.
+
+        Args:
+            dataloader: data loader of the current experience.
+        """
         self.train_loss = 0
         self.correct = 0
         self.total = 0
@@ -253,6 +269,12 @@ class LatentReplay(BaseStrategy):
             it += 1
 
     def loss_accuracy(self, mb_it, dataloader):
+        """Compute loss and accuracy
+        
+        Args:
+            mb_it: minibatch iteration
+            dataloader: data loader of the current experience.
+        """
 
         self.train_loss += self.loss.item()
         self.prob = F.softmax(self.mb_output, dim=1)
@@ -265,6 +287,11 @@ class LatentReplay(BaseStrategy):
             self.avg_loss = self.train_loss / len(self.mbatch)
 
     def update_mem_after_exp(self, exp):
+        """Update the random memory after the end of the current experience.
+
+        Args:
+            exp: current experience.
+        """
         # Number of patterns to add to the random memory
         h = min(
             self.rm_size // (self.train_exp_counter + 1),
@@ -297,6 +324,7 @@ class LatentReplay(BaseStrategy):
         self.cur_acts_y = None
 
     def get_tensor_size(self, tensor):
+        """ Return the size of a tensor in bytes."""
         if isinstance(tensor, np.ndarray):
             return tensor.nbytes
         elif isinstance(tensor, torch.Tensor):
@@ -305,7 +333,7 @@ class LatentReplay(BaseStrategy):
             return sys.getsizeof(tensor)
 
     def get_dict_size(self):
-        #tot_size = sys.getsizeof(self.rm)
+        """ Return the size of the replay memory in bytes."""
         tot_size = total_size(self.rm)
         for value in self.rm.values():
             tot_size += self.get_tensor_size(value[0])
@@ -314,11 +342,14 @@ class LatentReplay(BaseStrategy):
 
 
     def test(self, dataset):
-        """
-        Testing loop.
+        """Test the model on the given dataset.
 
-        :param dataset: dataset to test on.
+        Args:
+            dataset: dataset containing the patterns to classify.
 
+        Returns:
+            exps_acc: list of accuracies, one for each experience.
+            avg_acc: average accuracy over all the experiences.
         """
         exps_acc, avg_acc = super().test(dataset)
             

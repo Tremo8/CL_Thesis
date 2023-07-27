@@ -17,6 +17,15 @@ def total_size(o, handlers={}, verbose=False):
         handlers = {SomeContainerClass: iter,
                     OtherContainerClass: OtherContainerClass.get_elements}
 
+    Args:
+        o: the object to calculate the size of.
+        handlers: a dict containing handlers to call to iterate over the contents of any objects
+            that aren't accounted for by default. You only need to provide handlers for containers
+            that contain objects that are not accounted for by default.
+        verbose: flag to print the log of the size computation
+
+    Returns:
+        The approximate memory footprint in bytes of the object and all of its contents.
     """
     dict_handler = lambda d: chain.from_iterable(d.items())
     all_handlers = {tuple: iter,

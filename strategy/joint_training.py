@@ -1,19 +1,23 @@
-import utils
+import utility.utils as utils
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
 import torch
 
 class JointTraining(BaseStrategy):
+    """ JointTraining strategy."""
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu"):
         """Init.
 
-        :param model: PyTorch model.
-        :param optimizer: PyTorch optimizer.
-        :param criterion: loss function.
-        :param train_mb_size: mini-batch size for training.
-        :param train_epochs: number of training epochs.
-        :param eval_mb_size: mini-batch size for eval.
-        :param device: PyTorch device to run the model.
+        Args:
+            model: PyTorch model.
+            optimizer: PyTorch optimizer.
+            criterion: PyTorch criterion.
+            train_mb_size: training mini-batch size.
+            train_epochs: number of training epochs.
+            eval_mb_size: evaluation mini-batch size.
+            split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
+            patience: patience for early stopping.
+            device: PyTorch device where the model will be allocated.
         """
         super().__init__(
             model=model,
@@ -29,9 +33,13 @@ class JointTraining(BaseStrategy):
 
     def train(self, dataset,test_data = None, plotting = False):
         """
-        Training loop.
+        Training loop. If test data loader is provided, it will be used to test the model.
 
-        :param dataset: dataset to train the model.
+        Args:
+            dataset: dataset to train on.
+            test_data: dataset to test on.
+            plotting: flag to plot the task accuracy.
+
         """
         print("Start of the training process...")
         # Concatenate all the experiencess
@@ -60,11 +68,14 @@ class JointTraining(BaseStrategy):
             plotter.show_figures()
             
     def test(self, dataset):
-        """
-        Testing loop.
+        """Test the model on the given dataset.
 
-        :param dataset: dataset to test on.
+        Args:
+            dataset: dataset to test on.
 
+        Returns:
+            exps_acc: list of accuracies for each experience.
+            avg_acc: average accuracy over all the experiences.
         """
         exps_acc, avg_acc = super().test(dataset)
             

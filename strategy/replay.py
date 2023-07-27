@@ -1,22 +1,28 @@
-from strategy.base_strategy import BaseStrategy
-from torch.utils.data import DataLoader, ConcatDataset
-from avalanche.benchmarks.utils.data_loader import ReplayDataLoader
-import utils
 import torch
+from torch.utils.data import DataLoader, ConcatDataset
+
+from avalanche.benchmarks.utils.data_loader import ReplayDataLoader
+
+from strategy.base_strategy import BaseStrategy
+
+import utility.utils as utils
 
 class Replay(BaseStrategy):
+    """ Experience replay strategy. """
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, storage_policy, split_ratio = 0, patience = 5, device="cpu"):
-        """
-        Init.
+        """Init.
 
-        :param model: PyTorch model.
-        :param optimizer: PyTorch optimizer.
-        :param criterion: loss function.
-        :param train_mb_size: mini-batch size for training.
-        :param train_epochs: number of training epochs.
-        :param eval_mb_size: mini-batch size for eval.
-        :param storage_policy: storage policy.
-        :param device: PyTorch device to run the model.
+        Args:
+            model: PyTorch model.
+            optimizer: PyTorch optimizer.
+            criterion: PyTorch criterion.
+            train_mb_size: training mini-batch size.
+            train_epochs: number of training epochs.
+            eval_mb_size: evaluation mini-batch size.
+            storage_policy: storage policy.
+            split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
+            patience: patience for early stopping.
+            device: PyTorch device where the model will be allocated.
         """
         super().__init__(
             model=model,
@@ -34,31 +40,47 @@ class Replay(BaseStrategy):
         """ Storage policy. """
 
     def before_training_exp(self, dataset, shuffle: bool = True):
-            """ Here we set the dataloader. """
-            if len(self.storage_policy.buffer) == 0:
-                # first experience. We don't use the buffer, no need to change
-                # the dataloader.
-                return DataLoader(dataset, batch_size=self.train_mb_size, shuffle=shuffle)
+        """ 
+        This method is called before training on a new experience. It returns
+        the dataloader that will be used to train the model on the new
+        experience.
 
-            # replay dataloader samples mini-batches from the memory and current
-            # data separately and combines them together.
-            print("Override the dataloader.")
-            dataloader = ReplayDataLoader(
-                dataset,
-                self.storage_policy.buffer,
-                oversample_small_tasks=True,
-                batch_size=self.train_mb_size,
-                batch_size_mem  = self.train_mb_size,
-                shuffle=shuffle)
-            
-            return dataloader
+        Args:
+            dataset: dataset to train on.
+            shuffle: if True, shuffle the dataset.
+
+        Returns:
+            dataloader to use to train on the new experience.
+        """
+
+        if len(self.storage_policy.buffer) == 0:
+            # first experience. We don't use the buffer, no need to change
+            # the dataloader.
+            return DataLoader(dataset, batch_size=self.train_mb_size, shuffle=shuffle)
+
+        # replay dataloader samples mini-batches from the memory and current
+        # data separately and combines them together.
+        print("Override the dataloader.")
+        dataloader = ReplayDataLoader(
+            dataset,
+            self.storage_policy.buffer,
+            oversample_small_tasks=True,
+            batch_size=self.train_mb_size,
+            batch_size_mem  = self.train_mb_size,
+            shuffle=shuffle)
+        
+        return dataloader
 
     def train(self, dataset, test_data = None, plotting = False):
         """
-        Training loop.
-
-        :param dataset: dataset to train the model.
+        Training loop. If test data loader is provided, it will be used to test the model.
+        
+        Args:
+            dataset: dataset to train on.
+            test_data: test dataset to test the model.
+            plotting: if True, plot the accuracy after each experience.
         """
+
         print("Start of the training process...")
         for exp in dataset:
             # Print start training of experince exp
@@ -87,10 +109,14 @@ class Replay(BaseStrategy):
 
     def test(self, dataset):
         """
-        Testing loop.
+        Test the model on the given dataset.
+        
+        Args:
+            dataset: dataset to test the model on.
 
-        :param dataset: dataset to test on.
-
+        Returns:
+            exps_acc: list of accuracies for each experience.
+            avg_acc: average accuracy over all the experiences.
         """
         exps_acc, avg_acc = super().test(dataset)
             

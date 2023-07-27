@@ -3,7 +3,7 @@ import torch.nn as nn
 from micromind import PhiNet
 from micromind.networks.phinet import PhiNetConvBlock, SeparableConv2d
 from torchsummary import summary
-import utils
+import utility.utils as utils
 def remove_ModuleList(network, all_layers):
     """
     Recursively removes nn.ModuleList layers and adds all other layers to a list.

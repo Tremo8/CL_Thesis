@@ -1,21 +1,24 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import utils
 from torch.utils.data import DataLoader
-from pytorchtools import EarlyStopping
+
+import utility.utils as utils
+
+from utility.pytorchtools import EarlyStopping
 
 class BaseStrategy():
     def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu"):
         """Init.
 
-        :param model: PyTorch model.
-        :param optimizer: PyTorch optimizer.
-        :param criterion: loss function.
-        :param train_mb_size: mini-batch size for training.
-        :param train_epochs: number of training epochs.
-        :param eval_mb_size: mini-batch size for eval.
-        :param device: PyTorch device to run the model.
+        Args:
+            model: PyTorch model.
+            optimizer: PyTorch optimizer.
+            criterion: PyTorch criterion.
+            train_mb_size: training mini-batch size.
+            train_epochs: number of training epochs.
+            eval_mb_size: evaluation mini-batch size.
+            split_ratio: ratio to split the dataset into training and validation.
+            patience: patience for early stopping.
+            device: PyTorch device where the model will be allocated.
         """
         self.model = model
         """ PyTorch model. """
@@ -52,10 +55,11 @@ class BaseStrategy():
 
     def train(self, train_loader, valid_loader = None):
         """
-        Training loop.
+        Training loop. If validation data loader is provided, it will be used to perform early stopping.
 
-        :param dataset: dataset to train the model.
-
+        Args:
+            train_loader: training data loader.
+            valid_loader: validation data loader.
         """
         
         for epoch in range(self.train_epochs):
@@ -72,11 +76,13 @@ class BaseStrategy():
 
     def test(self, dataset):
         """
-        Testing loop.
+        Testing loop. It will test the model on each task in the dataset.
 
-        :param dataset: dataset to test the model.
+        Args:
+            dataset: dataset containing the tasks to test.
 
-        :return: accuracy of each task and average accuracy.
+        Returns:
+            Dictionary with the accuracy of each task and the average accuracy.
         """
         print("Starting the testing...")
         sum = 0
@@ -97,11 +103,13 @@ class BaseStrategy():
     
     def validate_and_early_stop(self, valid_loader):
         """
-        Validate the model and check if early stopping condition is met.
-        
-        :param valid_loader: validation data loader.
-        
-        :return: flag indicating whether early stopping condition is met or not.
+        Validate the model on the validation set and perform early stopping.
+
+        Args:
+            valid_loader: validation data loader.
+
+        Returns:
+            Flag indicating whether early stopping condition is met or not.
         """
 
         _, valid_loss = utils.test(self.model, self.criterion, valid_loader, self.device)
@@ -113,6 +121,11 @@ class BaseStrategy():
         return self.early_stopping.early_stop
     
     def update_tasks_acc(self, exps_acc):
+        """Update the dictionary with the accuracy of each task.
+
+        Args:
+            exps_acc: dictionary with the accuracy of each task.
+        """
         
         if self.tasks_acc:
             for key in exps_acc.keys():
@@ -122,6 +135,11 @@ class BaseStrategy():
                 self.tasks_acc[key] = [exps_acc[key]]
 
     def get_tasks_acc(self):
+        """Get the dictionary with the accuracy of each task.
+
+        Returns:
+            Dictionary with the accuracy of each task.
+        """
         return self.tasks_acc
 
     
