@@ -1,5 +1,6 @@
 # Ignore data directories
 data/*
+results/*
 
 # Ignore notebooks checkpoints
 PlotClass.ipynb

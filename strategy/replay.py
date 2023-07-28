@@ -9,7 +9,7 @@ import utility.utils as utils
 
 class Replay(BaseStrategy):
     """ Experience replay strategy. """
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, storage_policy, split_ratio = 0, patience = 5, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, storage_policy, split_ratio = 0, patience = 5, device="cpu", path = None):
         """Init.
 
         Args:
@@ -23,6 +23,7 @@ class Replay(BaseStrategy):
             split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            path: path to save the model.
         """
         super().__init__(
             model=model,
@@ -34,6 +35,7 @@ class Replay(BaseStrategy):
             split_ratio = split_ratio,
             patience=patience,
             device=device,
+            path = path
         )
 
         self.storage_policy = storage_policy

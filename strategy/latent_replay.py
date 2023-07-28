@@ -10,7 +10,7 @@ import numpy as np
 
 class LatentReplay(BaseStrategy):
     """ Latent replay strategy. """
-    def __init__(self, model, optimizer, criterion, train_epochs, train_mb_size = 21, replay_mb_size = 107,  eval_mb_size = 128, rm_size_MB = 1, manual_mb = True, split_ratio = 0, patience = 5, device = "cpu"):
+    def __init__(self, model, optimizer, criterion, train_epochs, train_mb_size = 21, replay_mb_size = 107,  eval_mb_size = 128, rm_size_MB = 1, manual_mb = True, split_ratio = 0, patience = 5, device = "cpu", path = None):
         """Init.
 
         Args:
@@ -28,6 +28,7 @@ class LatentReplay(BaseStrategy):
             split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            path: path to save the model.
         """
 
         super().__init__(
@@ -40,6 +41,7 @@ class LatentReplay(BaseStrategy):
             split_ratio=split_ratio,
             patience = patience,
             device=device,
+            path = path
         )
 
         self.rm_size_MB = rm_size_MB

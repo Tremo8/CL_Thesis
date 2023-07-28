@@ -6,7 +6,7 @@ import utility.utils as utils
 from utility.pytorchtools import EarlyStopping
 
 class BaseStrategy():
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", path = None):
         """Init.
 
         Args:
@@ -19,6 +19,7 @@ class BaseStrategy():
             split_ratio: ratio to split the dataset into training and validation.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            path: path to save the model.
         """
         self.model = model
         """ PyTorch model. """
@@ -46,7 +47,10 @@ class BaseStrategy():
         self.tasks_acc = dict()
         """ Dictionary with the accuracy of each task. """
 
-        self.early_stopping = EarlyStopping(patience=patience, verbose=2)
+        self.path = path
+        """ Path to save the model. """
+
+        self.early_stopping = EarlyStopping(patience=patience, verbose=2, path=self.path)
         """ Early stopping. """
 
         self.split_ratio = split_ratio

@@ -5,7 +5,7 @@ import torch
 
 class JointTraining(BaseStrategy):
     """ JointTraining strategy."""
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu"):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", path = None):
         """Init.
 
         Args:
@@ -18,6 +18,7 @@ class JointTraining(BaseStrategy):
             split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            path: path to save the model.
         """
         super().__init__(
             model=model,
@@ -29,6 +30,7 @@ class JointTraining(BaseStrategy):
             split_ratio = split_ratio,         
             patience = patience,
             device=device,
+            path = path
         )
 
     def train(self, dataset,test_data = None, plotting = False):
