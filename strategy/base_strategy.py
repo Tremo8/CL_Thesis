@@ -69,9 +69,9 @@ class BaseStrategy():
             if valid_loader is not None:
                 early_stopped = self.validate_and_early_stop(valid_loader)
                 if early_stopped:
-                    self.early_stopping.reset_counter()
                     print("Early stopping")
                     break
+        self.early_stopping.reset_counter()
     
 
     def test(self, dataset):

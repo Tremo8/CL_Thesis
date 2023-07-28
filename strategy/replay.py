@@ -103,9 +103,10 @@ class Replay(BaseStrategy):
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
                 exps_acc, _ = self.test(test_data)
                 self.update_tasks_acc(exps_acc)
-            print("-----------------------------------------------------------------------------------")
-            if plotting:
-                utils.plot_task_accuracy(self.tasks_acc)      
+        if plotting:
+            plotter = utils.TaskAccuracyPlotter()
+            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
+            plotter.show_figures() 
 
     def test(self, dataset):
         """

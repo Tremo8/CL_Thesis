@@ -145,10 +145,12 @@ class LatentReplay(BaseStrategy):
                 if val_loader is not None:
                     early_stopped = super().validate_and_early_stop(val_loader)
                 if early_stopped:
-                    self.early_stopping.reset_counter()
                     print("Early stopping")
                     break
                 print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%")
+            
+            # Reset the early stopping counter after each experience training loop
+            self.early_stopping.reset_counter()
             
             # Update the memory
             self.update_mem_after_exp(exp)
@@ -328,6 +330,7 @@ class LatentReplay(BaseStrategy):
         if isinstance(tensor, np.ndarray):
             return tensor.nbytes
         elif isinstance(tensor, torch.Tensor):
+            print("Compute tensor size")
             return tensor.element_size() * tensor.numel()
         else:
             return sys.getsizeof(tensor)
@@ -345,7 +348,7 @@ class LatentReplay(BaseStrategy):
         """Test the model on the given dataset.
 
         Args:
-            dataset: dataset containing the patterns to classify.
+            dataset: dataset containing the test experiences.
 
         Returns:
             exps_acc: list of accuracies, one for each experience.
