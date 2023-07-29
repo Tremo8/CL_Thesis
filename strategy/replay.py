@@ -95,11 +95,11 @@ class Replay(BaseStrategy):
             else:
                 train_dataset = exp.dataset
                 val_loader = None
-            train_loader = self.before_training_exp(train_dataset, shuffle=True)
+            train_loader = self.before_training_exp(train_dataset.dataset, shuffle=True)
 
             super().train(train_loader, val_loader)
 
-            self.storage_policy.update_from_dataset(train_dataset)
+            self.storage_policy.update_from_dataset(train_dataset.dataset)
             if test_data is not None:
                 print("")
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
