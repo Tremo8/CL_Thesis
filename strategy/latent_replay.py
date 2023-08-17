@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
 from utility.memory_computation import total_size
+from utility.CSVsave import save_results_to_csv
 import utility.utils as utils
 import sys
 from torchinfo import summary
@@ -10,8 +11,12 @@ import numpy as np
 
 class LatentReplay(BaseStrategy):
     """ Latent replay strategy. """
-    def __init__(self, model, optimizer, criterion, train_epochs, train_mb_size = 21, replay_mb_size = 107,  eval_mb_size = 128, rm_size_MB = 1, manual_mb = True, split_ratio = 0, patience = 5, device = "cpu", path = None):
+    def __init__(self, model, optimizer, criterion, train_epochs, train_mb_size = 21, replay_mb_size = 107,  eval_mb_size = 128, rm_size_MB = None, rm_size = None, manual_mb = True, split_ratio = 0, patience = 5, device = "cpu", file_name = None, path = None):
         """Init.
+
+        It is necessary to specify one between rm_size and rm_size_MB, the other must be None. If both are None or both are not None, an error is raised.
+        When rm_size_MB is specified, the replay memory is filled up to the specified size in MB. When rm_size is specified, the replay memory is filled up to 
+        the specified size in number of elements. The function manages the two options automatically based on the specified parameter.
 
         Args:
             model: PyTorch model.
@@ -22,6 +27,7 @@ class LatentReplay(BaseStrategy):
             replay_mb_size: replay mini-batch size.
             eval_mb_size: evaluation mini-batch size.
             rm_size_MB: size of the replay memory in MBytes.
+            rm_size: size of the replay memory in number of elements.
             manual_mb: If True the mini-batch size should be manually setted. If False it computes the mini-batch size
             as `len(train_dataset) // ( ( len(train_dataset) + len(replay_buffer) ) // train_mb_size )` and the memory
             mini-batch size as `train_mb_size - replay_mb_size`.
@@ -44,8 +50,17 @@ class LatentReplay(BaseStrategy):
             path = path
         )
 
+        self.rm_size = rm_size
+        """ Size of the replay memory in number of elements. """
+
         self.rm_size_MB = rm_size_MB
-        """ Size of the replay memory. """
+        """ Size of the replay memory in MB. """
+
+        if rm_size_MB is None and rm_size is None:
+            raise ValueError("One between rm_size and rm_size_MB must be not None")
+        
+        if rm_size_MB is not None and rm_size is not None:
+            raise ValueError("Only one between rm_size and rm_size_MB must be not None")
 
         self.replay_mb_size = replay_mb_size
         """ Replay mini-batch size. """
@@ -55,6 +70,8 @@ class LatentReplay(BaseStrategy):
 
         self.train_exp_counter = 0
         """ Number of training experiences so far. """
+
+        self.file_name = file_name
 
     def before_training_exp(self):
         """
@@ -129,40 +146,50 @@ class LatentReplay(BaseStrategy):
             # Create the dataloader
             if self.split_ratio != 0:
                 train_dataset, val_dataset = utils.split_dataset(exp.dataset, split_ratio=self.split_ratio)
-                print("Train dataset size: ", len(train_dataset))
-                print("Validation dataset size: ", len(val_dataset))
                 val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True)
             else:
                 train_dataset = exp.dataset
                 val_loader = None
-            train_loader = self.make_train_dataloader(train_dataset, manual_mb = self.manual_mb, shuffle=True)
             
             # Data loader initialization
             # Called at the start of each learning experience
-            #train_loader = self.make_train_dataloader(exp.dataset, shuffle=True)
-            
+            train_loader = self.make_train_dataloader(train_dataset, manual_mb = self.manual_mb, shuffle=True)
+           
             # Training loop over the current experience
             for self.epoch in range(self.train_epochs):
                 self.training_epoch(train_loader)
+
+                # If there is the validation dataset, early stopping is active
                 if val_loader is not None:
                     early_stopped = super().validate_and_early_stop(val_loader)
-                if early_stopped:
-                    print("Early stopping")
-                    break
+                    if early_stopped:
+                        if self.file_name is not None:
+                            save_results_to_csv([["Stop Epoch"],[self.epoch]], self.file_name)
+                        print("Early stopping")
+                        break
                 print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%")
             
             # Reset the early stopping counter after each experience training loop
             if val_loader is not None:
                 self.early_stopping.reset_counter()
             
-            # Update the memory
-            self.update_mem_after_exp(exp)
+            # Update the memory based on the MB size
+            if self.rm_size_MB is not None:
+                self.update_mem_after_exp_in_MB(exp)
 
+            # Update the memory based on the number of elements
+            if self.rm_size is not None:
+                self.update_mem_after_exp(exp)
+            
             self.train_exp_counter += 1
                 
             if test_data is not None:
                 print("")
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
+
+                if self.file_name is not None:
+                    save_results_to_csv([["Trained Task "],[exp.classes_in_this_experience]], self.file_name)
+
                 exps_acc, _ = self.test(test_data)
                 # Get the first self.train_exp_counter keys
                 first_keys = list(exps_acc.keys())[:self.train_exp_counter]
@@ -176,6 +203,10 @@ class LatentReplay(BaseStrategy):
 
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
+
+        if self.path is not None:
+            torch.save(self.model.state_dict(), self.path)
+            
         if plotting:
             #utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
             plotter = utils.TaskAccuracyPlotter()
@@ -183,8 +214,15 @@ class LatentReplay(BaseStrategy):
             plotter.show_figures()
             
         print(f"Size of the replay memory: {self.get_dict_size() / 1048576 :.2f} MB")
+        # Total element in the replay memory
+        total_size =  sum([value[0].size(0) for value in self.rm.values()])
+        print(f"Number of element in the replay memory: {total_size}")
+
         print("End of the training process.")
         print("")
+
+        if self.file_name is not None:
+            save_results_to_csv([["Memory MB", "Memory Elements"],[self.get_dict_size() / 1048576, total_size]], self.file_name)
 
     def _unpack_minibatch(self):
         """Move to device"""
@@ -292,7 +330,44 @@ class LatentReplay(BaseStrategy):
             self.avg_loss = self.train_loss / len(self.mbatch)
 
     def update_mem_after_exp(self, exp):
-        """Update the random memory after the end of the current experience.
+        """Update the random memory after the end of the current experience to keep a fixed number of element in the memory.
+
+        Args:
+            exp: current experience.
+        """
+        # Number of patterns to add to the random memory
+        h = min(
+            self.rm_size // (self.train_exp_counter + 1),
+            self.cur_acts.size(0),
+        )
+
+        # Sample h random patterns from the current experience
+        idxs_cur = torch.randperm(self.cur_acts.size(0))[:h]
+
+        # Get the corresponding labels
+        rm_add_y = torch.tensor([self.cur_acts_y[idx_cur].item() for idx_cur in idxs_cur])
+
+        # Concatenate the latent activations and the labels
+        rm_add = [self.cur_acts[idxs_cur], rm_add_y]
+
+        if self.train_exp_counter == 0:
+            self.rm = {exp.current_experience: rm_add}
+        else:
+            sum_length = sum(len(rm_exp[0]) for rm_exp in self.rm.values())
+            if sum_length + len(rm_add[0]) <= self.rm_size:
+                self.rm[exp.current_experience] = rm_add
+            else:
+                for value in self.rm.values():
+                    perm = torch.randperm(value[0].size(0))
+                    value[0] = value[0][perm][0:h]
+                    value[1] = value[1][perm][0:h]
+                self.rm[exp.current_experience] = rm_add
+
+        self.cur_acts = None
+        self.cur_acts_y = None
+
+    def update_mem_after_exp_in_MB(self, exp):
+        """Update the random memory after the end of the current experience to keep a fixed number of MB in the memory.
 
         Args:
             exp: current experience.
@@ -300,6 +375,7 @@ class LatentReplay(BaseStrategy):
         # Size of an element of the random memory
         element_size = self.get_tensor_size(self.cur_acts[0]) + self.get_tensor_size(self.cur_acts_y[0])
 
+        # Size of the random memory in bytes
         rm_size_B = self.rm_size_MB * 1024 * 1024
 
         b = min(
@@ -314,18 +390,12 @@ class LatentReplay(BaseStrategy):
 
             # Number of elements that can be added to the replay memory
             e = b // element_size
-            #print(f"We can add {e} element of dimension {element_size} bytes. Since the replay memory is of dimension {rm_size_B} bytes.")
-            #print(f"and the available space is {b} bytes.")
         else:
             dict_B = self.get_dict_size()
-            #print(f"The replay memory is {dict_B} B of dimension {rm_size_B} B")
-            #print(f"The sum of the replay memory and the current experience is {dict_B + b} bytes and the memory has dimension {rm_size_B} bytes")
             if dict_B + b <= rm_size_B:
                 # If the replay memory is not full, we add the current experience to the replay memory without removing any element
                 e = b // element_size
                 remove_elements = False
-                #print(f"We can add {e} element of dimension {element_size} bytes. Since the replay memory is of dimension {rm_size_B} bytes.")
-                #print(f"and the available space is {b} bytes.")
             else:
                 # If the replay memory is full, we add the current experience to the replay memory 
                 # and remove some element from the replay memory to make room for the new elements
@@ -333,9 +403,8 @@ class LatentReplay(BaseStrategy):
                 # Number of elements for each experience in the replay memory
                 e = (rm_size_B // (self.train_exp_counter + 1)) // element_size
                 remove_elements = True
-                #print("e: ", e)
 
-        # Sample h random patterns from the current experience
+        # Sample e random patterns from the current experience
         idxs_cur = torch.randperm(self.cur_acts.size(0))[:e]
 
         # Get the corresponding labels
@@ -354,10 +423,6 @@ class LatentReplay(BaseStrategy):
                 value[0] = value[0][perm][0:e]
                 value[1] = value[1][perm][0:e]
             self.rm[exp.current_experience] = rm_add
-
-        # Total element in the replay memory
-        total_size =  sum([value[0].size(0) for value in self.rm.values()])
-        print(f"Number of element in the replay memory: {total_size}")
 
         self.cur_acts = None
         self.cur_acts_y = None
@@ -379,7 +444,6 @@ class LatentReplay(BaseStrategy):
             tot_size += self.get_tensor_size(value[1])
         return tot_size
 
-
     def test(self, dataset):
         """Test the model on the given dataset.
 
@@ -390,7 +454,8 @@ class LatentReplay(BaseStrategy):
             exps_acc: list of accuracies, one for each experience.
             avg_acc: average accuracy over all the experiences.
         """
-        exps_acc, avg_acc = super().test(dataset)
+
+        exps_acc, avg_acc = super().test(dataset, self.file_name)
             
         return exps_acc, avg_acc
 
@@ -412,8 +477,6 @@ class LatentReplay(BaseStrategy):
         )
         # Concatenate the latent activations and the labels
         rm_add = [self.cur_acts[idxs_cur], rm_add_y]
-        
-        #print("rm_add[0].shape: ", rm_add[0].shape)
 
         # replace patterns in random memory
         if self.train_exp_counter == 0:

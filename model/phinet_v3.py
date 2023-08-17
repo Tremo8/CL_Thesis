@@ -50,6 +50,7 @@ class PhiNetV3(nn.Module):
         :param device: Device to use for the model.
     
         """
+           
         super().__init__()
         
         if replace_bn_with_brn:

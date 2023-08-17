@@ -2,6 +2,7 @@
 data/*
 results/*
 
-# Ignore notebooks checkpoints
-PlotClass.ipynb
-checkpoint.pt
+
+# Ignore models
+final_model_best.pth.tar
+model_best.pth.tar

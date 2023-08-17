@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import utility.utils as utils
+from utility.CSVsave import save_results_to_csv
 
 from utility.pytorchtools import EarlyStopping
 
@@ -50,7 +51,7 @@ class BaseStrategy():
         self.path = path
         """ Path to save the model. """
 
-        self.early_stopping = EarlyStopping(patience=patience, verbose=2, path=self.path)
+        self.early_stopping = EarlyStopping(patience=patience, verbose=2, path=None)
         """ Early stopping. """
 
         self.split_ratio = split_ratio
@@ -78,8 +79,7 @@ class BaseStrategy():
         if valid_loader is not None:
             self.early_stopping.reset_counter()
     
-
-    def test(self, dataset):
+    def test(self, dataset, file_name = None):
         """
         Testing loop. It will test the model on each task in the dataset.
 
@@ -87,24 +87,37 @@ class BaseStrategy():
             dataset: dataset containing the tasks to test.
 
         Returns:
-            Dictionary with the accuracy of each task and the average accuracy.
+            List of dictionaries containing the results of each task and the average accuracy.
         """
+
         print("Starting the testing...")
-        sum = 0
+        sum_accuracy = 0
         exps_acc = dict()
+        results = [[],[]]
         for exp in dataset:
             print("Testing task ", exp.task_label)
             print('Classes in this task:', exp.classes_in_this_experience)
 
             experience_dataloader = DataLoader(exp.dataset, batch_size=self.eval_mb_size, shuffle=False)
             test_acc, test_loss = utils.test(self.model, self.criterion, experience_dataloader, self.device)
-            sum += test_acc
+            sum_accuracy += test_acc
             print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%")
             exps_acc[exp.task_label] = test_acc
-        avg_acc = sum/len(dataset)
-        print(f"Average accuracy: {avg_acc:.2f}%")
-     
-        return exps_acc, avg_acc
+
+            results[0].append(f"Task {exp.task_label}")
+            results[1].append(test_acc)
+
+        # Calculate and add average accuracy
+        avg_accuracy = sum_accuracy / len(dataset)
+        results[0].append(f"Avg Acc")
+        results[1].append(avg_accuracy)
+        
+        if file_name is not None:
+            save_results_to_csv(results, file_name)
+
+        print(f"Average accuracy: {avg_accuracy:.2f}%")
+
+        return exps_acc, avg_accuracy
     
     def validate_and_early_stop(self, valid_loader):
         """
