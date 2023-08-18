@@ -60,7 +60,7 @@ def main():
     eval_mb_size = 16  # Define eval_mb_size
 
     # Set the current device to the GPU:index
-    torch.cuda.set_device(1) if torch.cuda.is_available()
+    torch.cuda.set_device(1) if torch.cuda.is_available() else None
 
     # Set the device as cuda, the GPU specified as default will be used
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
