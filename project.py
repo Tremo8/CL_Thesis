@@ -59,13 +59,17 @@ def main():
 
     eval_mb_size = 16  # Define eval_mb_size
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    # Set the current device to the GPU:index
+    torch.cuda.set_device(1) if torch.cuda.is_available()
 
+    # Set the device as cuda, the GPU specified as default will be used
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+    print(f"Device: {device}")    
+    
     torch.manual_seed(0)
 
     # Your code
-    model5 = PhiNet.from_pretrained("ImageNet-1k", 3.0, 0.75, 6.0, 7, 224, num_classes=1000, path="final_model_best.pth.tar", classifier=False)
+    model5 = PhiNet.from_pretrained("ImageNet-1k", 3.0, 0.75, 6.0, 7, 224, num_classes=1000, path="final_model_best.pth.tar", classifier=False, device = device)
     model5 = PhiNetV3(model5, latent_layer_num=args.latent_layer, replace_bn_with_brn=False).to(device)
     optimizer5 = Adam(model5.parameters(), lr=args.lr, weight_decay=0)
 
