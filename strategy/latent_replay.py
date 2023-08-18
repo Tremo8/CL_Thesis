@@ -137,7 +137,7 @@ class LatentReplay(BaseStrategy):
         
         # Freeze the model up to the latent layers
         self.before_training_exp()
-
+        timings = []
         print("Start of the training process...")
         for exp in dataset:
             print("Training of the experience with class: ", exp.classes_in_this_experience)
@@ -155,20 +155,30 @@ class LatentReplay(BaseStrategy):
             # Called at the start of each learning experience
             train_loader = self.make_train_dataloader(train_dataset, manual_mb = self.manual_mb, shuffle=True)
            
+            tot_exp_time = 0
             # Training loop over the current experience
             for self.epoch in range(self.train_epochs):
+                starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                starter.record()
                 self.training_epoch(train_loader)
-
+                ender.record()
+                torch.cuda.synchronize()
+                curr_time = starter.elapsed_time(ender)
+                tot_exp_time += curr_time
+                timings.append(curr_time)
+                print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%, Training TIme: {timings[-1]/1000:.3f} s")
                 # If there is the validation dataset, early stopping is active
                 if val_loader is not None:
                     early_stopped = super().validate_and_early_stop(val_loader)
                     if early_stopped:
                         if self.file_name is not None:
-                            save_results_to_csv([["Stop Epoch"],[self.epoch]], self.file_name)
+                            save_results_to_csv([["Stop Epoch", f"Training Time task {exp.task_label}"],[self.epoch, tot_exp_time/1000]], self.file_name)
                         print("Early stopping")
                         break
-                print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%")
-            
+
+            if self.file_name is not None:
+                save_results_to_csv([[f"Training Time task {exp.task_label}"],[tot_exp_time/1000]], self.file_name)   
+
             # Reset the early stopping counter after each experience training loop
             if val_loader is not None:
                 self.early_stopping.reset_counter()
@@ -188,7 +198,7 @@ class LatentReplay(BaseStrategy):
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
 
                 if self.file_name is not None:
-                    save_results_to_csv([["Trained Task "],[exp.classes_in_this_experience]], self.file_name)
+                    save_results_to_csv([["Trained Task "],[exp.task_label]], self.file_name)
 
                 exps_acc, _ = self.test(test_data)
                 # Get the first self.train_exp_counter keys
@@ -203,6 +213,9 @@ class LatentReplay(BaseStrategy):
 
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
+
+        if self.file_name is not None:
+            save_results_to_csv([["Total Training Time"],[sum(timings)/1000]], self.file_name)   
 
         if self.path is not None:
             torch.save(self.model.state_dict(), self.path)

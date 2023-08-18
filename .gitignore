@@ -1,8 +1,7 @@
 # Ignore data directories
-data/*
-results/*
+data
+results
 
+# Ignore model checkpoint files
+*.pth.tar
 
-# Ignore models
-final_model_best.pth.tar
-model_best.pth.tar
