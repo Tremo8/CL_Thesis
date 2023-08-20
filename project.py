@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--train_epochs", type=int, help="Number of training epochs")
     parser.add_argument("--rm_size_MB", type=int, help="Memory Size in MB")
     parser.add_argument("--rm_size", type=int, help="Memory Size in number of samples")
+    parser.add_argument("--weight_decay", type=float, help="Weight decay")
     parser.add_argument("--split_ratio", type=float, help="Split ratio")
     
     args = parser.parse_args()
@@ -32,15 +33,23 @@ def parse_args():
 
 def main():
     args = parse_args()
-    os.makedirs(f"results/latent_{args.latent_layer}", exist_ok=True) 
+    os.makedirs(f"results/latent_{args.latent_layer}/weight_decay_{args.weight_decay}", exist_ok=True) 
 
-    file_name = f"results/latent_{args.latent_layer}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
-    model_name = f"results/latent_{args.latent_layer}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
+    file_name = f"results/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
+    model_name = f"results/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
    
+    print(f"lr: {args.lr}")
+    print(f"latent layer: {args.latent_layer}")
+    print(f"epochs: {args.train_epochs}")
+    print(f"rm_size_MB: {args.rm_size_MB}")
+    print(f"rm_size: {args.rm_size}")
+    print(f"weight_decay: {args.weight_decay}")
+    print(f"split_ratio: {args.split_ratio}")
+
     if file_name is not None:  
         setup = [
-            ["Learning Rate", "Latent Layer", "Epochs", "Memory MB", "Memory Elements", "Split Ratio"],
-            [args.lr, args.latent_layer, args.train_epochs, args.rm_size_MB, args.rm_size, args.split_ratio]
+            ["Learning Rate", "Latent Layer", "Epochs", "Memory MB", "Memory Elements","Weight Decay", "Split Ratio"],
+            [args.lr, args.latent_layer, args.train_epochs, args.rm_size_MB, args.rm_size, args.weight_decay, args.split_ratio]
         ]
         save_results_to_csv(setup, file_name)
     
@@ -71,7 +80,7 @@ def main():
     # Your code
     model5 = PhiNet.from_pretrained("ImageNet-1k", 3.0, 0.75, 6.0, 7, 224, num_classes=1000, path="final_model_best.pth.tar", classifier=False, device = device)
     model5 = PhiNetV3(model5, latent_layer_num=args.latent_layer, replace_bn_with_brn=False).to(device)
-    optimizer5 = Adam(model5.parameters(), lr=args.lr, weight_decay=0)
+    optimizer5 = Adam(model5.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     latent_replay = LatentReplay(
         model=model5,
