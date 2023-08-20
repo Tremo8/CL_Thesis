@@ -156,28 +156,47 @@ class LatentReplay(BaseStrategy):
             train_loader = self.make_train_dataloader(train_dataset, manual_mb = self.manual_mb, shuffle=True)
            
             tot_exp_time = 0
+            train_losses = []
+            train_accuracies = []
             # Training loop over the current experience
             for self.epoch in range(self.train_epochs):
+
+                # Initialize the timer
                 starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                # Start Recording the time
                 starter.record()
+
+                # Training
                 self.training_epoch(train_loader)
+
+                # Stop Recording the time and compute the elapsed time
                 ender.record()
                 torch.cuda.synchronize()
                 curr_time = starter.elapsed_time(ender)
+
+                # Save some statics the be saved in output
                 tot_exp_time += curr_time
                 timings.append(curr_time)
-                print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%, Training TIme: {timings[-1]/1000:.3f} s")
+                train_losses.append(self.avg_loss)
+                train_accuracies.append(self.acc)
+
+                print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {self.avg_loss:.4f}, Train Accuracy: {self.acc:.2f}%, Training Time: {timings[-1]/1000:.3f} s")
+
                 # If there is the validation dataset, early stopping is active
                 if val_loader is not None:
                     early_stopped = super().validate_and_early_stop(val_loader)
                     if early_stopped:
                         if self.file_name is not None:
-                            save_results_to_csv([["Stop Epoch", f"Training Time task {exp.task_label}"],[self.epoch, tot_exp_time/1000]], self.file_name)
+                            save_results_to_csv([["Stop Epoch"],[self.epoch+1]], self.file_name)
                         print("Early stopping")
                         break
 
             if self.file_name is not None:
-                save_results_to_csv([[f"Training Time task {exp.task_label}"],[tot_exp_time/1000]], self.file_name)   
+                save_results_to_csv([["Trained Task "],[exp.task_label]], self.file_name)
+                # Calculate the average train loss and accuracy
+                avg_train_loss = sum(train_losses) / len(train_losses)
+                avg_train_acc = sum(train_accuracies) / len(train_accuracies)
+                save_results_to_csv([[f"Training Time", "Avg Training Loss", "Avg Training Acc"],[tot_exp_time/1000, avg_train_loss, avg_train_acc]], self.file_name)   
 
             # Reset the early stopping counter after each experience training loop
             if val_loader is not None:
@@ -196,9 +215,6 @@ class LatentReplay(BaseStrategy):
             if test_data is not None:
                 print("")
                 print("Test after the training of the experience with class: ", exp.classes_in_this_experience)
-
-                if self.file_name is not None:
-                    save_results_to_csv([["Trained Task "],[exp.task_label]], self.file_name)
 
                 exps_acc, _ = self.test(test_data)
                 # Get the first self.train_exp_counter keys
