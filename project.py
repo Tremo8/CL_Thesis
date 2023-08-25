@@ -10,6 +10,7 @@ from avalanche.benchmarks.classic import SplitCIFAR10
 
 from strategy.latent_replay import LatentReplay
 from utility.CSVsave import save_results_to_csv
+from utility.utils import benchmark_selction
 
 from micromind import PhiNet
 from model.phinet_v3 import PhiNetV3
@@ -20,6 +21,7 @@ criterion = torch.nn.CrossEntropyLoss()  # Define your criterion
 def parse_args():
     parser = argparse.ArgumentParser(description="Read variables from the terminal.")
     
+    parser.add_argument("--benchmark_name", type=str, help="Benchmark name")
     parser.add_argument("--lr", type=float, help="Learning rate")
     parser.add_argument("--latent_layer", type=int, help="Latent layer size")
     parser.add_argument("--train_epochs", type=int, help="Number of training epochs")
@@ -33,11 +35,12 @@ def parse_args():
 
 def main():
     args = parse_args()
-    os.makedirs(f"results/latent_{args.latent_layer}/weight_decay_{args.weight_decay}", exist_ok=True) 
+    os.makedirs(f"results/{args.benchmark_name}/phinet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}", exist_ok=True) 
 
-    file_name = f"results/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
-    model_name = f"results/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
+    file_name = f"results/{args.benchmark_name}/phinet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
+    model_name = f"results/{args.benchmark_name}/phinet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
    
+    print(f"benchmark_name: {args.benchmark_name}")
     print(f"lr: {args.lr}")
     print(f"latent layer: {args.latent_layer}")
     print(f"epochs: {args.train_epochs}")
@@ -60,11 +63,11 @@ def main():
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
     
-    split_cifar = SplitCIFAR10(n_experiences=5, seed=0, return_task_id=True, train_transform=transform, eval_transform=transform)
+    benchmark = benchmark_selction(args.benchmark_name, n_experiences=5, seed=0, return_task_id=True, train_transform=transform, eval_transform=transform)
 
     # recovering the train and test streams
-    train_stream = split_cifar.train_stream
-    test_stream = split_cifar.test_stream
+    train_stream = benchmark.train_stream
+    test_stream = benchmark.test_stream
 
     eval_mb_size = 16  # Define eval_mb_size
 

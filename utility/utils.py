@@ -9,7 +9,37 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from avalanche.models.batch_renorm import BatchRenorm2D
+from avalanche.benchmarks.datasets import CORe50Dataset
+from avalanche.benchmarks.classic import SplitMNIST, SplitCIFAR10
+from avalanche.benchmarks.generators import nc_benchmark
 
+def benchmark_selction(name, n_experiences=5, seed=0, return_task_id = True, train_transform = None, eval_transform = None, dataset_root = None):
+    """
+    Select the benchmark to be used for training and testing.
+
+    Args:
+        name (str): The name of the benchmark to be used.
+        n_experiences (int): The number of experiences in the benchmark. (default: 5)
+        seed (int): The seed to be used for reproducibility. (default: 0)
+        return_task_id (bool): Whether to return the task ID. (default: True)
+        train_transform (torchvision.transforms): The transformations to be applied to the training data. (default: None)
+        eval_transform (torchvision.transforms): The transformations to be applied to the evaluation data. (default: None)
+        dataset_root (str): The root directory of the dataset. (default: None)
+
+    Returns:
+        Benchmark: The benchmark to be used for training and testing.
+    """
+    if name == 'core50':
+        train_data = CORe50Dataset(root= dataset_root, transform=train_transform, object_level = False)
+        test_data = CORe50Dataset(root= dataset_root, train=False, transform=eval_transform, object_level = False)
+        return nc_benchmark(train_data, test_data, n_experiences=n_experiences, task_labels=return_task_id, seed=seed)
+    elif name == 'split_mnist':
+        return SplitMNIST(n_experiences=n_experiences, seed=seed, return_task_id = return_task_id, train_transform = train_transform, eval_transform = eval_transform, dataset_root = dataset_root)
+    elif name == 'split_cifar10':
+        return SplitCIFAR10(n_experiences=n_experiences, seed=seed, return_task_id = return_task_id, train_transform = train_transform, eval_transform = eval_transform, dataset_root = dataset_root)
+    else:
+        raise Exception('Invalid benchmark name')
+    
 def train(model, optimizer, criterion, train_loader, device):
     """
     Train the model using the provided optimizer and criterion.
