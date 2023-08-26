@@ -73,7 +73,7 @@ class BaseStrategy():
         train_losses = []
         train_accuracies = []
 
-        for epoch in range(self.train_epochs):
+        for self.epoch in range(self.train_epochs):
             
             # Initialize the timer
             starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
@@ -86,10 +86,10 @@ class BaseStrategy():
 
             # Save some statics the be saved in output
             tot_exp_time += curr_time
-            train_losses.append(self.avg_loss)
-            train_accuracies.append(self.acc)
+            train_losses.append(train_loss)
+            train_accuracies.append(train_acc)
 
-            print(f"Epoch: {epoch+1}/{self.train_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.2f}%, Training Time: {curr_time/1000:.3f} s")
+            print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.2f}%, Training Time: {curr_time/1000:.3f} s")
             if valid_loader is not None:
                 early_stopped = self.validate_and_early_stop(valid_loader)
                 if early_stopped:
