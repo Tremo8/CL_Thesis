@@ -7,7 +7,7 @@ from utility.CSVsave import save_results_to_csv
 from utility.pytorchtools import EarlyStopping
 
 class BaseStrategy():
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", path = None):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", file_name = None, path = None):
         """Init.
 
         Args:
@@ -51,6 +51,9 @@ class BaseStrategy():
         self.path = path
         """ Path to save the model. """
 
+        self.file_name = file_name
+        """ File name to save the results. """
+
         self.early_stopping = EarlyStopping(patience=patience, verbose=2, path=None)
         """ Early stopping. """
 
@@ -66,20 +69,45 @@ class BaseStrategy():
             train_loader: training data loader.
             valid_loader: validation data loader.
         """
-        
-        for epoch in range(self.train_epochs):
-            train_acc, train_loss = utils.train(self.model, self.optimizer, self.criterion, train_loader, self.device)
+        tot_exp_time = 0
+        train_losses = []
+        train_accuracies = []
 
-            print(f"Epoch: {epoch+1}/{self.train_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.2f}%")
+        for epoch in range(self.train_epochs):
+            
+            # Initialize the timer
+            starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+            # Start Recording the time
+            starter.record()
+            train_acc, train_loss = utils.train(self.model, self.optimizer, self.criterion, train_loader, self.device)
+            ender.record()
+            torch.cuda.synchronize()
+            curr_time = starter.elapsed_time(ender)
+
+            # Save some statics the be saved in output
+            tot_exp_time += curr_time
+            train_losses.append(self.avg_loss)
+            train_accuracies.append(self.acc)
+
+            print(f"Epoch: {epoch+1}/{self.train_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.2f}%, Training Time: {curr_time/1000:.3f} s")
             if valid_loader is not None:
                 early_stopped = self.validate_and_early_stop(valid_loader)
                 if early_stopped:
+                    if self.file_name is not None:
+                            save_results_to_csv([["Stop Epoch"],[self.epoch+1]], self.file_name)
                     print("Early stopping")
                     break
+
+        if self.file_name is not None:
+                # Calculate the average train loss and accuracy
+                avg_train_loss = sum(train_losses) / len(train_losses)
+                avg_train_acc = sum(train_accuracies) / len(train_accuracies)
+                save_results_to_csv([[f"Training Time", "Avg Training Loss", "Avg Training Acc"],[tot_exp_time/1000, avg_train_loss, avg_train_acc]], self.file_name)   
+        
         if valid_loader is not None:
             self.early_stopping.reset_counter()
     
-    def test(self, dataset, file_name = None):
+    def test(self, dataset):
         """
         Testing loop. It will test the model on each task in the dataset.
 
@@ -112,8 +140,8 @@ class BaseStrategy():
         results[0].append(f"Avg Acc")
         results[1].append(avg_accuracy)
         
-        if file_name is not None:
-            save_results_to_csv(results, file_name)
+        if self.file_name is not None:
+            save_results_to_csv(results, self.file_name)
 
         print(f"Average accuracy: {avg_accuracy:.2f}%")
 

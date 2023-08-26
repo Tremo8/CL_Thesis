@@ -1,11 +1,12 @@
 import utility.utils as utils
+from utility.CSVsave import save_results_to_csv
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
 import torch
 
 class JointTraining(BaseStrategy):
     """ JointTraining strategy."""
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", path = None):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", file_name = None, path = None):
         """Init.
 
         Args:
@@ -57,12 +58,18 @@ class JointTraining(BaseStrategy):
             train_loader = DataLoader(concat_set, batch_size=self.train_mb_size, shuffle=True)
             val_loader = None
 
+        # Train the model
         super().train(train_loader, val_loader)
+
         if test_data is not None:
             print("")
             print("Test after the joint training")
             exps_acc, _ = self.test(test_data)
             self.update_tasks_acc(exps_acc)
+        
+        if self.path is not None:
+            torch.save(self.model.state_dict(), self.path)
+
         print("-----------------------------------------------------------------------------------")
         if plotting:
             plotter = utils.TaskAccuracyPlotter()

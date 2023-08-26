@@ -1,7 +1,8 @@
 # Ignore data directories
 data
 results
+testing
 
 # Ignore model checkpoint files
 *.pth.tar
-
+Final.ipynb

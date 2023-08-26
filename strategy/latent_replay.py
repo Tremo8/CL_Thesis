@@ -47,6 +47,7 @@ class LatentReplay(BaseStrategy):
             split_ratio=split_ratio,
             patience = patience,
             device=device,
+            file_name = file_name,
             path = path
         )
 
@@ -70,8 +71,6 @@ class LatentReplay(BaseStrategy):
 
         self.train_exp_counter = 0
         """ Number of training experiences so far. """
-
-        self.file_name = file_name
 
     def before_training_exp(self):
         """
@@ -484,7 +483,7 @@ class LatentReplay(BaseStrategy):
             avg_acc: average accuracy over all the experiences.
         """
 
-        exps_acc, avg_acc = super().test(dataset, self.file_name)
+        exps_acc, avg_acc = super().test(dataset)
             
         return exps_acc, avg_acc
 
