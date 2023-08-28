@@ -195,7 +195,7 @@ class LatentReplay(BaseStrategy):
                 # Calculate the average train loss and accuracy
                 avg_train_loss = sum(train_losses) / len(train_losses)
                 avg_train_acc = sum(train_accuracies) / len(train_accuracies)
-                save_results_to_csv([[f"Training Time", "Avg Training Loss", "Avg Training Acc"],[tot_exp_time/1000, avg_train_loss, avg_train_acc]], self.file_name)   
+                save_results_to_csv([[f"Training Time", "Avg Training Loss", "Avg Training Acc"],[tot_exp_time/1000, avg_train_loss, avg_train_acc/100]], self.file_name)   
 
             # Reset the early stopping counter after each experience training loop
             if val_loader is not None:

@@ -133,12 +133,12 @@ class BaseStrategy():
             exps_acc[exp.task_label] = test_acc
 
             results[0].append(f"Task {exp.task_label}")
-            results[1].append(test_acc)
+            results[1].append(test_acc/100)
 
         # Calculate and add average accuracy
         avg_accuracy = sum_accuracy / len(dataset)
         results[0].append(f"Avg Acc")
-        results[1].append(avg_accuracy)
+        results[1].append(avg_accuracy/100)
         
         if self.file_name is not None:
             save_results_to_csv(results, self.file_name)

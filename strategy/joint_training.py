@@ -1,5 +1,4 @@
 import utility.utils as utils
-from utility.CSVsave import save_results_to_csv
 from strategy.base_strategy import BaseStrategy
 from torch.utils.data import DataLoader
 import torch
@@ -31,6 +30,7 @@ class JointTraining(BaseStrategy):
             split_ratio = split_ratio,         
             patience = patience,
             device=device,
+            file_name = file_name,
             path = path
         )
 
