@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from micromind import PhiNet
 from mobilenetv1 import MobilenetV1
+from mobilenetv2 import MobilenetV2
 from torchinfo import summary
 
 def measure_inference_time(model, input_shape):
@@ -98,3 +99,12 @@ if __name__ == "__main__":
     print(f"Average inference time of MobileNetV1: {mean:.3f} +/- {std:.3f} ms")
     print(f"Number of multiply-accumulate operations of MobileNetV1: {mac:,}")
     print(f"Number of parameters of MobileNetV1: {parm_nr:,}")
+
+    print("")
+
+    mobilenetv2 = MobilenetV2(True, latent_layer_num=15).to(device)
+    mean, std = measure_inference_time(mobilenetv2, input_shape)
+    mac, parm_nr = get_info(mobilenetv2, input_shape)    
+    print(f"Average inference time of MobileNetV2: {mean:.3f} +/- {std:.3f} ms")
+    print(f"Number of multiply-accumulate operations of MobileNetV2: {mac:,}")
+    print(f"Number of parameters of MobileNetV2: {parm_nr:,}")
