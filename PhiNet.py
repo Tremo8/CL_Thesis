@@ -10,7 +10,8 @@ from strategy.latent_replay import LatentReplay
 from utility.CSVsave import save_results_to_csv
 from utility.utils import benchmark_selction
 
-from avalanche.models import MobilenetV1
+from micromind import PhiNet
+from model.phinet_v3 import PhiNetV3
 
 # Define other necessary variables or imports
 criterion = torch.nn.CrossEntropyLoss()  # Define your criterion
@@ -32,10 +33,10 @@ def parse_args():
 
 def main():
     args = parse_args()
-    os.makedirs(f"results/{args.benchmark_name}/mobilenet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}", exist_ok=True) 
+    os.makedirs(f"results/{args.benchmark_name}/phinet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}", exist_ok=True) 
 
-    file_name = f"results/{args.benchmark_name}/mobilenet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
-    model_name = f"results/{args.benchmark_name}/mobilenet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
+    file_name = f"results/{args.benchmark_name}/phinet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
+    model_name = f"results/{args.benchmark_name}/phinet/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
    
     print(f"benchmark_name: {args.benchmark_name}")
     print(f"lr: {args.lr}")
@@ -78,7 +79,8 @@ def main():
     torch.manual_seed(0)
 
     # Your code
-    model5 = MobilenetV1(pretrained=True, latent_layer_num=args.latent_layer).to(device)
+    model5 = PhiNet.from_pretrained("ImageNet-1k", 3.0, 0.75, 6.0, 7, 224, num_classes=1000, path="final_model_best.pth.tar", classifier=False, device = device)
+    model5 = PhiNetV3(model5, latent_layer_num=args.latent_layer, replace_bn_with_brn=False).to(device)
     optimizer5 = Adam(model5.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     latent_replay = LatentReplay(

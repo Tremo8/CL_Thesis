@@ -62,8 +62,9 @@ class MobilenetV2(nn.Module):
             lat_acts = orig_acts
 
         x = self.end_features(lat_acts)
-       # x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), -1)
         logits = self.output(x)
+        logits = logits.view(logits.size(0), -1)
 
         if return_lat_acts:
             return logits, orig_acts
