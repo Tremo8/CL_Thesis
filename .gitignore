@@ -2,7 +2,10 @@
 data
 results
 testing
+training
 
 # Ignore model checkpoint files
 *.pth.tar
-Final.ipynb
+
+# Ignore Jupyter Notebook
+Model_Test.ipynb
