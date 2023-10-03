@@ -20,6 +20,7 @@ class BaseStrategy():
             split_ratio: ratio to split the dataset into training and validation.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            file_name: file name to save the results. If None, no results are saved.
             path: path to save the model.
         """
         self.model = model
@@ -69,6 +70,7 @@ class BaseStrategy():
             train_loader: training data loader.
             valid_loader: validation data loader.
         """
+
         tot_exp_time = 0
         train_losses = []
         train_accuracies = []
@@ -77,11 +79,16 @@ class BaseStrategy():
             
             # Initialize the timer
             starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+
             # Start Recording the time
             starter.record()
+
             train_acc, train_loss = utils.train(self.model, self.optimizer, self.criterion, train_loader, self.device)
+
             ender.record()
+
             torch.cuda.synchronize()
+
             curr_time = starter.elapsed_time(ender)
 
             # Save some statics the be saved in output
@@ -90,6 +97,7 @@ class BaseStrategy():
             train_accuracies.append(train_acc)
 
             print(f"Epoch: {self.epoch+1}/{self.train_epochs}, Train Loss: {train_loss:.4f}, Train Accuracy: {train_acc:.2f}%, Training Time: {curr_time/1000:.3f} s")
+
             if valid_loader is not None:
                 early_stopped = self.validate_and_early_stop(valid_loader)
                 if early_stopped:
@@ -117,19 +125,23 @@ class BaseStrategy():
         Returns:
             List of dictionaries containing the results of each task and the average accuracy.
         """
+        
+        print("\nStart of the testing process...")
 
-        print("Starting the testing...")
         sum_accuracy = 0
         exps_acc = dict()
         results = [[],[]]
+
         for exp in dataset:
             print("Testing task ", exp.task_label)
             print('Classes in this task:', exp.classes_in_this_experience)
 
             experience_dataloader = DataLoader(exp.dataset, batch_size=self.eval_mb_size, shuffle=False)
+
             test_acc, test_loss = utils.test(self.model, self.criterion, experience_dataloader, self.device)
-            sum_accuracy += test_acc
             print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%")
+
+            sum_accuracy += test_acc
             exps_acc[exp.task_label] = test_acc
 
             results[0].append(f"Task {exp.task_label}")
@@ -137,13 +149,13 @@ class BaseStrategy():
 
         # Calculate and add average accuracy
         avg_accuracy = sum_accuracy / len(dataset)
+        print(f"Average accuracy: {avg_accuracy:.2f}%")
+
         results[0].append(f"Avg Acc")
         results[1].append(avg_accuracy/100)
         
         if self.file_name is not None:
             save_results_to_csv(results, self.file_name)
-
-        print(f"Average accuracy: {avg_accuracy:.2f}%")
 
         return exps_acc, avg_accuracy
     
