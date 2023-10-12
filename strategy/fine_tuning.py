@@ -7,7 +7,7 @@ from strategy.base_strategy import BaseStrategy
 
 class FineTuning(BaseStrategy):
     """ Fine tuning strategy."""
-    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", path = None):
+    def __init__(self, model, optimizer, criterion, train_mb_size, train_epochs, eval_mb_size, split_ratio = 0, patience = 5, device="cpu", file_name = None, path = None):
         """Init.
 
         Args:
@@ -32,6 +32,7 @@ class FineTuning(BaseStrategy):
             split_ratio = split_ratio,
             patience=patience,
             device=device,
+            file_name = file_name,
             path=path
         )
 
@@ -70,6 +71,9 @@ class FineTuning(BaseStrategy):
                 self.update_tasks_acc(exps_acc)
             print("-----------------------------------------------------------------------------------")
         
+        if self.path is not None:
+            torch.save(self.model.state_dict(), self.path)
+
         # Plotting
         if plotting:
             plotter = utils.TaskAccuracyPlotter()
