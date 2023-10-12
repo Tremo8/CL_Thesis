@@ -13,6 +13,14 @@ from avalanche.benchmarks.datasets import CORe50Dataset
 from avalanche.benchmarks.classic import SplitMNIST, SplitCIFAR10
 from avalanche.benchmarks.generators import nc_benchmark
 
+from avalanche.models import MobilenetV1
+#from micromind import PhiNet
+#from model.phinet_v3 import PhiNetV3
+
+from micromind import PhiNet
+from model.phinet_v3 import PhiNetV3
+from model.mobilenetv2 import MobilenetV2
+
 def benchmark_selction(name, n_experiences=5, seed=0, return_task_id = True, train_transform = None, eval_transform = None, dataset_root = None):
     """
     Select the benchmark to be used for training and testing.
@@ -39,6 +47,34 @@ def benchmark_selction(name, n_experiences=5, seed=0, return_task_id = True, tra
         return SplitCIFAR10(n_experiences=n_experiences, seed=seed, return_task_id = return_task_id, train_transform = train_transform, eval_transform = eval_transform, dataset_root = dataset_root)
     else:
         raise Exception('Invalid benchmark name')
+    
+def model_selection(name, latent_layer, pretrained=True):
+    """
+    Selects a model based on the given name and latent layer.
+
+    Args:
+        name (str): The name of the model to select.
+        latent_layer (int): The number of the latent layer to use.
+        pretrained (bool, optional): Whether to use a pretrained model. Defaults to True.
+
+    Returns:
+        torch.nn.Module: The selected model.
+
+    Raises:
+        ValueError: If an invalid model name is provided.
+    """
+    if name == 'mobilenetv1':
+        model = MobilenetV1(pretrained=pretrained, latent_layer_num = latent_layer)
+        return model
+    elif name == 'mobilenetv2':
+        model = MobilenetV2(pretrained=pretrained, latent_layer_num = latent_layer)
+        return model
+    elif name == 'phinet':
+        model = PhiNet.from_pretrained("ImageNet-1k", 3.0, 0.75, 6.0, 7, 224, num_classes=1000, path="phinet2.pth.tar", classifier=False)
+        model = PhiNetV3(model, latent_layer_num=latent_layer)#, replace_bn_with_brn=False)
+        return model
+    else:
+        raise ValueError(f"Invalid model name: {name}")
     
 def train(model, optimizer, criterion, train_loader, device):
     """
