@@ -18,7 +18,7 @@ from avalanche.models import MobilenetV1
 #from model.phinet_v3 import PhiNetV3
 
 from micromind import PhiNet
-from model.phinet_v3 import PhiNetV3
+from model.phinetv1 import PhiNetV1
 from model.mobilenetv2 import MobilenetV2
 
 def benchmark_selction(name, n_experiences=5, seed=0, return_task_id = True, train_transform = None, eval_transform = None, dataset_root = None):
@@ -70,8 +70,9 @@ def model_selection(name, latent_layer, pretrained=True):
         model = MobilenetV2(pretrained=pretrained, latent_layer_num = latent_layer)
         return model
     elif name == 'phinet':
-        model = PhiNet.from_pretrained("ImageNet-1k", 3.0, 0.75, 6.0, 7, 224, num_classes=1000, path="phinet2.pth.tar", classifier=False)
-        model = PhiNetV3(model, latent_layer_num=latent_layer)#, replace_bn_with_brn=False)
+        model = PhiNet(input_shape=(3,224,224), alpha = 2.3, beta = 0.75, t_zero = 5, include_top = True,num_classes = 1000, divisor = 8)
+        model.load_state_dict(torch.load('./new_phinet_small_71.pth.tar')["state_dict"])
+        model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     else:
         raise ValueError(f"Invalid model name: {name}")
