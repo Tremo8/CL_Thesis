@@ -2,9 +2,6 @@ import torch.nn as nn
 import torch
 from pytorchcv.models.common import conv1x1
 
-
-from pytorchcv.models.mobilenetv2 import mobilenetv2_w1
-
 def remove_sequential(network, all_layers):
 
     for layer in network.children():
@@ -20,14 +17,12 @@ class MobilenetV2(nn.Module):
     """MobileNet v1 implementation. This model
     can be instantiated from a pretrained network."""
 
-    def __init__(self, pretrained=True, latent_layer_num=20):
+    def __init__(self, model, latent_layer_num=20):
         """
         :param pretrained: boolean indicating whether to load pretrained weights
         :parm latent_layer_num: determines the number of layers to consider as latent layers
         """
         super().__init__()
-
-        model = mobilenetv2_w1(pretrained=pretrained)
 
         model.features.final_pool = nn.AvgPool2d(7, stride=1)
 

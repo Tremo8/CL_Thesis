@@ -17,6 +17,8 @@ from avalanche.models import MobilenetV1
 #from micromind import PhiNet
 #from model.phinet_v3 import PhiNetV3
 
+from pytorchcv.models.mobilenetv2 import mobilenetv2_w1, mobilenetv2_w3d4
+
 from micromind import PhiNet
 from model.phinetv1 import PhiNetV1
 from model.mobilenetv2 import MobilenetV2
@@ -67,7 +69,12 @@ def model_selection(name, latent_layer, pretrained=True):
         model = MobilenetV1(pretrained=pretrained, latent_layer_num = latent_layer)
         return model
     elif name == 'mobilenetv2':
-        model = MobilenetV2(pretrained=pretrained, latent_layer_num = latent_layer)
+        model = mobilenetv2_w1(pretrained=pretrained)
+        model = MobilenetV2(model=model,latent_layer_num = latent_layer)
+        return model
+    elif name == '0.75_mobilenetv2':
+        model = mobilenetv2_w3d4(pretrained=pretrained)
+        model = MobilenetV2(model=model,latent_layer_num = latent_layer)
         return model
     elif name == 'phinet_2.3_0.75_5':
         model = PhiNet(input_shape=(3,224,224), alpha = 2.3, beta = 0.75, t_zero = 5, include_top = True,num_classes = 1000, divisor = 8)
