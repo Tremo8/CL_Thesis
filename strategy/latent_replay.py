@@ -429,7 +429,8 @@ class LatentReplay(BaseStrategy):
                 # and remove some element from the replay memory to make room for the new elements
 
                 # Number of elements for each experience in the replay memory
-                e = (rm_size_B // (self.train_exp_counter + 1)) // element_size
+                r = (rm_size_B // (self.train_exp_counter + 1)) // element_size
+                e = (rm_size_B -((self.train_exp_counter)*r*element_size)) // element_size
                 remove_elements = True
 
         # Sample e random patterns from the current experience
@@ -448,8 +449,8 @@ class LatentReplay(BaseStrategy):
         else:
             for value in self.rm.values():
                 perm = torch.randperm(value[0].size(0))
-                value[0] = value[0][perm][0:e]
-                value[1] = value[1][perm][0:e]
+                value[0] = value[0][perm][0:r]
+                value[1] = value[1][perm][0:r]
             self.rm[exp.current_experience] = rm_add
 
         self.cur_acts = None
