@@ -6,6 +6,11 @@ from torch.optim import Adam
 import torchvision
 import torchvision.transforms as transforms
 
+import warnings
+
+# Filter out the specific UserWarning you want to suppress
+warnings.filterwarnings("ignore", category=UserWarning, module="torchvision.transforms.functional")
+
 from strategy.replay import Replay
 from utility.CSVsave import save_results_to_csv
 from utility.utils import benchmark_selction, model_selection
