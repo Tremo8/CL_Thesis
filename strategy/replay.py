@@ -68,7 +68,7 @@ class Replay(BaseStrategy):
         if len(self.storage_policy.buffer) == 0:
             # first experience. We don't use the buffer, no need to change
             # the dataloader.
-            return DataLoader(dataset, batch_size=self.train_mb_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=self.train_mb_size, shuffle=shuffle, num_workers=16, pin_memory=True, persistent_workers=True)
 
         # replay dataloader samples mini-batches from the memory and current
         # data separately and combines them together.
@@ -82,7 +82,10 @@ class Replay(BaseStrategy):
             oversample_small_tasks=True,
             batch_size = self.train_mb_size,
             batch_size_mem  = self.mem_mb_size,
-            shuffle=shuffle)
+            shuffle=shuffle,
+            num_workers=16, 
+            pin_memory=True, 
+            persistent_workers=True)
         
         return dataloader
 
@@ -105,7 +108,7 @@ class Replay(BaseStrategy):
                 train_dataset, val_dataset = classification_subset(dataset=exp.dataset, indices=train_dataset.indices), classification_subset(dataset=exp.dataset, indices=val_dataset.indices)
                 print("Train dataset size: ", len(train_dataset))
                 print("Validation dataset size: ", len(val_dataset))
-                val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True, num_workers=8)
             else:
                 train_dataset = exp.dataset
                 val_loader = None

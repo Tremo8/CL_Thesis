@@ -6,6 +6,11 @@ from torch.optim import Adam
 import torchvision
 import torchvision.transforms as transforms
 
+import warnings
+
+# Filter out the specific UserWarning you want to suppress
+warnings.filterwarnings("ignore", category=UserWarning, module="torchvision.transforms.functional")
+
 from strategy.latent_replay import LatentReplay
 from utility.CSVsave import save_results_to_csv
 from utility.utils import benchmark_selction, model_selection
@@ -21,7 +26,7 @@ def parse_args():
     parser.add_argument("--lr", type=float, help="Learning rate")
     parser.add_argument("--latent_layer", type=int, help="Latent layer size")
     parser.add_argument("--train_epochs", type=int, help="Number of training epochs")
-    parser.add_argument("--rm_size_MB", type=int, help="Memory Size in MB")
+    parser.add_argument("--rm_size_MB", type=float, help="Memory Size in MB")
     parser.add_argument("--rm_size", type=int, help="Memory Size in number of samples")
     parser.add_argument("--weight_decay", type=float, help="Weight decay")
     parser.add_argument("--split_ratio", type=float, help="Split ratio")
@@ -70,7 +75,7 @@ def main():
     eval_mb_size = 16  # Define eval_mb_size
 
     # Set the current device to the GPU:index
-    torch.cuda.set_device(args.device) if torch.cuda.is_available() else None
+    #torch.cuda.set_device(args.device) if torch.cuda.is_available() else None
 
     # Set the device as cuda, the GPU specified as default will be used
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
