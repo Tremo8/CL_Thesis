@@ -72,10 +72,14 @@ class LatentReplay(BaseStrategy):
         self.train_exp_counter = 0
         """ Number of training experiences so far. """
 
+        self.cur_acts = torch.randn([30000, 24, 28, 28]).to("cuda")
+
     def before_training_exp(self):
         """
         Freezing the latent layers.
         """
+        self.cur_acts = self.cur_acts.detach().clone().cpu()
+        self.cur_acts = None
 
         self.model.eval()
         self.model.end_features.train()
@@ -120,6 +124,9 @@ class LatentReplay(BaseStrategy):
             dataset,
             batch_size=current_batch_mb_size,
             shuffle=shuffle,
+            num_workers = 12,
+            pin_memory=True,
+            persistent_workers=True
         )
 
         return dataloader
@@ -318,14 +325,12 @@ class LatentReplay(BaseStrategy):
             if self.epoch == 0:
                 # On the first epoch only: store latent activations. Those
                 # activations will be used to update the replay buffer.
-                lat_acts = lat_acts.detach().clone().cpu()
-                self.mbatch_y = self.mbatch[1][:len(self.mbatch[0])].detach().clone().cpu()
                 if mb_it == 0:
-                    self.cur_acts = lat_acts
-                    self.cur_acts_y = self.mbatch_y
+                    self.cur_acts = lat_acts.detach()
+                    self.cur_acts_y = self.mbatch[1][:len(self.mbatch[0])].detach()
                 else:
-                    self.cur_acts = torch.cat((self.cur_acts, lat_acts), 0)
-                    self.cur_acts_y = torch.cat((self.cur_acts_y, self.mbatch_y), 0)
+                    self.cur_acts = torch.cat((self.cur_acts , lat_acts.detach()), 0)
+                    self.cur_acts_y = torch.cat((self.cur_acts_y, self.mbatch[1][:len(self.mbatch[0])].detach()), 0)
 
             # Loss & Backward
             self.loss = self.criterion(self.mb_output, self.mbatch[1])
@@ -400,6 +405,9 @@ class LatentReplay(BaseStrategy):
         Args:
             exp: current experience.
         """
+        self.cur_acts = self.cur_acts.detach().clone().cpu()
+        self.cur_acts_y = self.cur_acts_y.detach().clone().cpu()
+
         # Size of an element of the random memory
         element_size = self.get_tensor_size(self.cur_acts[0]) + self.get_tensor_size(self.cur_acts_y[0])
 
@@ -417,20 +425,20 @@ class LatentReplay(BaseStrategy):
             # than the maximum size of the replay memory.
 
             # Number of elements that can be added to the replay memory
-            e = b // element_size
+            e = int(b // element_size)
         else:
             dict_B = self.get_dict_size()
             if dict_B + b <= rm_size_B:
                 # If the replay memory is not full, we add the current experience to the replay memory without removing any element
-                e = b // element_size
+                e = int(b // element_size)
                 remove_elements = False
             else:
                 # If the replay memory is full, we add the current experience to the replay memory 
                 # and remove some element from the replay memory to make room for the new elements
 
                 # Number of elements for each experience in the replay memory
-                r = (rm_size_B // (self.train_exp_counter + 1)) // element_size
-                e = (rm_size_B -((self.train_exp_counter)*r*element_size)) // element_size
+                r = int((rm_size_B // (self.train_exp_counter + 1)) // element_size)
+                e = int((rm_size_B -((self.train_exp_counter)*r*element_size)) // element_size)
                 remove_elements = True
 
         # Sample e random patterns from the current experience
