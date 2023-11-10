@@ -60,7 +60,7 @@ class JointTraining(BaseStrategy):
             train_loader = DataLoader(train_dataset, batch_size=self.train_mb_size, shuffle=True)
             val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True)
         else:
-            train_loader = DataLoader(concat_set, batch_size=self.train_mb_size, shuffle=True, num_workers=8)
+            train_loader = DataLoader(concat_set, batch_size=self.train_mb_size, shuffle=True, num_workers=16, pin_memory=True, persistent_workers=True)
             val_loader = None
 
         # Train the model
