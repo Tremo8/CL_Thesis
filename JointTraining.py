@@ -10,6 +10,11 @@ from strategy.joint_training import JointTraining
 from utility.CSVsave import save_results_to_csv
 from utility.utils import benchmark_selction, model_selection
 
+import warnings
+
+# Filter out the specific UserWarning you want to suppress
+warnings.filterwarnings("ignore", category=UserWarning, module="torchvision.transforms.functional")
+
 from torchinfo import summary
 
 # Define other necessary variables or imports
