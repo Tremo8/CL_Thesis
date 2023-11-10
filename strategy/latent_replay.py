@@ -72,15 +72,10 @@ class LatentReplay(BaseStrategy):
         self.train_exp_counter = 0
         """ Number of training experiences so far. """
 
-        self.cur_acts = torch.randn([30000, 24, 28, 28]).to("cuda")
-
     def before_training_exp(self):
         """
         Freezing the latent layers.
         """
-        self.cur_acts = self.cur_acts.detach().clone().cpu()
-        self.cur_acts = None
-
         self.model.eval()
         self.model.end_features.train()
         self.model.output.train()
@@ -148,7 +143,6 @@ class LatentReplay(BaseStrategy):
         for exp in dataset:
             print("Training of the experience with class: ", exp.classes_in_this_experience)
 
-            # Test
             # Create the dataloader
             if self.split_ratio != 0:
                 train_dataset, val_dataset = utils.split_dataset(exp.dataset, split_ratio=self.split_ratio)
@@ -164,6 +158,13 @@ class LatentReplay(BaseStrategy):
             tot_exp_time = 0
             train_losses = []
             train_accuracies = []
+
+            # Initialize the tensor that will contain the latent activations
+            total_size=len(train_loader.dataset)
+            x = torch.rand(1,3,224,224).to(self.device)
+            y = self.model.lat_features(x)
+            self.cur_acts = torch.empty((total_size,) + y.shape[1:]).to(self.device)
+
             # Training loop over the current experience
             for self.epoch in range(self.train_epochs):
 
@@ -242,12 +243,6 @@ class LatentReplay(BaseStrategy):
         if self.path is not None:
             torch.save(self.model.state_dict(), self.path)
             
-        if plotting:
-            #utils.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-            plotter = utils.TaskAccuracyPlotter()
-            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-            plotter.show_figures()
-            
         print(f"Size of the replay memory: {self.get_dict_size() / 1048576 :.2f} MB")
         # Total element in the replay memory
         total_size =  sum([value[0].size(0) for value in self.rm.values()])
@@ -277,7 +272,7 @@ class LatentReplay(BaseStrategy):
         self.correct = 0
         self.total = 0
         it = 0
-
+        offset = 0
         for mb_it, self.mbatch in enumerate(dataloader):
             # Move to device the minibatch
             self._unpack_minibatch()
@@ -325,13 +320,14 @@ class LatentReplay(BaseStrategy):
             if self.epoch == 0:
                 # On the first epoch only: store latent activations. Those
                 # activations will be used to update the replay buffer.
+                self.cur_acts[offset:offset+lat_acts.size(0)] = lat_acts
+                offset += lat_acts.size(0)
                 if mb_it == 0:
-                    self.cur_acts = lat_acts.detach()
-                    self.cur_acts_y = self.mbatch[1][:len(self.mbatch[0])].detach()
+                    #self.cur_acts = lat_acts
+                    self.cur_acts_y = self.mbatch[1][:len(self.mbatch[0])]
                 else:
-                    self.cur_acts = torch.cat((self.cur_acts , lat_acts.detach()), 0)
-                    self.cur_acts_y = torch.cat((self.cur_acts_y, self.mbatch[1][:len(self.mbatch[0])].detach()), 0)
-
+                    #self.cur_acts = torch.cat((self.cur_acts, lat_acts), 0)
+                    self.cur_acts_y = torch.cat((self.cur_acts_y, self.mbatch[1][:len(self.mbatch[0])]), 0)
             # Loss & Backward
             self.loss = self.criterion(self.mb_output, self.mbatch[1])
             self.loss.backward()
@@ -397,7 +393,11 @@ class LatentReplay(BaseStrategy):
                 self.rm[exp.current_experience] = rm_add
 
         self.cur_acts = None
+        del self.cur_acts
+        torch.cuda.empty_cache()
         self.cur_acts_y = None
+        del self.cur_acts_y
+        torch.cuda.empty_cache()
 
     def update_mem_after_exp_in_MB(self, exp):
         """Update the random memory after the end of the current experience to keep a fixed number of MB in the memory.
@@ -405,9 +405,6 @@ class LatentReplay(BaseStrategy):
         Args:
             exp: current experience.
         """
-        self.cur_acts = self.cur_acts.detach().clone().cpu()
-        self.cur_acts_y = self.cur_acts_y.detach().clone().cpu()
-
         # Size of an element of the random memory
         element_size = self.get_tensor_size(self.cur_acts[0]) + self.get_tensor_size(self.cur_acts_y[0])
 
@@ -462,7 +459,11 @@ class LatentReplay(BaseStrategy):
             self.rm[exp.current_experience] = rm_add
 
         self.cur_acts = None
+        del self.cur_acts
+        torch.cuda.empty_cache()
         self.cur_acts_y = None
+        del self.cur_acts_y
+        torch.cuda.empty_cache()
 
     def get_tensor_size(self, tensor):
         """ Return the size of a tensor in bytes."""
