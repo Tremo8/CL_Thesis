@@ -53,7 +53,8 @@ class MobilenetV2(nn.Module):
                 orig_acts = self.lat_features(x)
             lat_acts = torch.cat((orig_acts, latent_input), 0)
         else:
-            orig_acts = self.lat_features(x)
+            with torch.no_grad():
+                orig_acts = self.lat_features(x)
             lat_acts = orig_acts
 
         x = self.end_features(lat_acts)
