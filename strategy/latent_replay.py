@@ -163,7 +163,50 @@ class LatentReplay(BaseStrategy):
             total_size=len(train_loader.dataset)
             x = torch.rand(1,3,224,224).to(self.device)
             y = self.model.lat_features(x)
-            self.cur_acts = torch.empty((total_size,) + y.shape[1:]).to(self.device)
+            #self.cur_acts = torch.empty((total_size,) + y.shape[1:]).to(self.device)
+
+            if self.rm_size is not None:
+                # Number of patterns to add to the replay memory in elements
+                self.h = min(
+                    self.rm_size // (self.train_exp_counter + 1),
+                    total_size,
+                )
+            else:
+                # Size of an element of the replay memory is equal to the size of the latent activations plus the size of the labels
+                element_size = self.get_tensor_size(y) + self.get_tensor_size(train_loader.dataset[0][1])
+
+                # Size of the random memory in bytes
+                self.rm_size_B = self.rm_size_MB * 1024 * 1024
+
+                b = min(
+                    self.rm_size_B // (self.train_exp_counter + 1), # Space available for each experience encountered so far
+                    total_size * element_size, # Space needed for the current experience
+                )
+
+                if self.train_exp_counter == 0:
+                    # In the first experience the replay memory is empty. We add the current experience to the replay memory
+                    # up to the maximum size of the replay memory or the maximum size of the current experience if it is smaller
+                    # than the maximum size of the replay memory.
+
+                    # Number of elements that can be added to the replay memory
+                    self.h = int(b // element_size)
+                else:
+                    dict_B = self.get_dict_size()
+                    if dict_B + b <= self.rm_size_B:
+                        # If the replay memory is not full, we add the current experience to the replay memory without removing any element
+                        self.h = int(b // element_size)
+                        self.remove_elements = False
+                    else:
+                        # If the replay memory is full, we add the current experience to the replay memory 
+                        # and remove some element from the replay memory to make room for the new elements
+
+                        # Number of elements for each experience in the replay memory
+                        self.r = int((self.rm_size_B // (self.train_exp_counter + 1)) // element_size)
+                        self.h = int((self.rm_size_B -((self.train_exp_counter)*self.r*element_size)) // element_size)
+                        self.remove_elements = True
+
+            self.random_indices = torch.randperm(total_size)[:self.h]
+            self.cur_acts = torch.empty((self.h,) + y.shape[1:]).to(self.device)
 
             # Training loop over the current experience
             for self.epoch in range(self.train_epochs):
@@ -273,6 +316,7 @@ class LatentReplay(BaseStrategy):
         self.total = 0
         it = 0
         offset = 0
+        init = False
         for mb_it, self.mbatch in enumerate(dataloader):
             # Move to device the minibatch
             self._unpack_minibatch()
@@ -318,16 +362,17 @@ class LatentReplay(BaseStrategy):
             self.mb_output, lat_acts = self.model(self.mbatch[0], latent_input=lat_mb_x, return_lat_acts=True)
 
             if self.epoch == 0:
-                # On the first epoch only: store latent activations. Those
-                # activations will be used to update the replay buffer.
-                self.cur_acts[offset:offset+lat_acts.size(0)] = lat_acts
-                offset += lat_acts.size(0)
-                if mb_it == 0:
-                    #self.cur_acts = lat_acts
-                    self.cur_acts_y = self.mbatch[1][:len(self.mbatch[0])]
-                else:
-                    #self.cur_acts = torch.cat((self.cur_acts, lat_acts), 0)
-                    self.cur_acts_y = torch.cat((self.cur_acts_y, self.mbatch[1][:len(self.mbatch[0])]), 0)
+                for data_index, data_sample in enumerate(lat_acts):
+                    global_index = mb_it * self.train_mb_size + data_index
+                    if global_index in self.random_indices:
+                        self.cur_acts[offset:offset+1] = data_sample
+                        offset += 1
+                        if not init:
+                            self.cur_acts_y = self.mbatch[1][data_index].unsqueeze(0)
+                            init = True
+                        else:
+                            self.cur_acts_y = torch.cat((self.cur_acts_y, self.mbatch[1][data_index].unsqueeze(0)), 0)#[:len(self.mbatch[0])]), 0)
+
             # Loss & Backward
             self.loss = self.criterion(self.mb_output, self.mbatch[1])
             self.loss.backward()
@@ -364,14 +409,11 @@ class LatentReplay(BaseStrategy):
         Args:
             exp: current experience.
         """
-        # Number of patterns to add to the random memory
-        h = min(
-            self.rm_size // (self.train_exp_counter + 1),
-            self.cur_acts.size(0),
-        )
-
         # Sample h random patterns from the current experience
-        idxs_cur = torch.randperm(self.cur_acts.size(0))[:h]
+        self.cur_acts = self.cur_acts.detach().cpu()
+        self.cur_acts_y = self.cur_acts_y.detach().cpu()
+
+        idxs_cur = torch.randperm(self.cur_acts.size(0))[:self.h]
 
         # Get the corresponding labels
         rm_add_y = torch.tensor([self.cur_acts_y[idx_cur].item() for idx_cur in idxs_cur])
@@ -388,16 +430,12 @@ class LatentReplay(BaseStrategy):
             else:
                 for value in self.rm.values():
                     perm = torch.randperm(value[0].size(0))
-                    value[0] = value[0][perm][0:h]
-                    value[1] = value[1][perm][0:h]
+                    value[0] = value[0][perm][0:self.h]
+                    value[1] = value[1][perm][0:self.h]
                 self.rm[exp.current_experience] = rm_add
 
         self.cur_acts = None
-        del self.cur_acts
-        torch.cuda.empty_cache()
         self.cur_acts_y = None
-        del self.cur_acts_y
-        torch.cuda.empty_cache()
 
     def update_mem_after_exp_in_MB(self, exp):
         """Update the random memory after the end of the current experience to keep a fixed number of MB in the memory.
@@ -405,41 +443,11 @@ class LatentReplay(BaseStrategy):
         Args:
             exp: current experience.
         """
-        # Size of an element of the random memory
-        element_size = self.get_tensor_size(self.cur_acts[0]) + self.get_tensor_size(self.cur_acts_y[0])
-
-        # Size of the random memory in bytes
-        rm_size_B = self.rm_size_MB * 1024 * 1024
-
-        b = min(
-            rm_size_B // (self.train_exp_counter + 1), # Space available for each experience encountered so far
-            self.cur_acts.size(0) * element_size, # Space needed for the current experience
-        )
-        
-        if self.train_exp_counter == 0:
-            # In the first experience the replay memory is empty. We add the current experience to the replay memory
-            # up to the maximum size of the replay memory or the maximum size of the current experience if it is smaller
-            # than the maximum size of the replay memory.
-
-            # Number of elements that can be added to the replay memory
-            e = int(b // element_size)
-        else:
-            dict_B = self.get_dict_size()
-            if dict_B + b <= rm_size_B:
-                # If the replay memory is not full, we add the current experience to the replay memory without removing any element
-                e = int(b // element_size)
-                remove_elements = False
-            else:
-                # If the replay memory is full, we add the current experience to the replay memory 
-                # and remove some element from the replay memory to make room for the new elements
-
-                # Number of elements for each experience in the replay memory
-                r = int((rm_size_B // (self.train_exp_counter + 1)) // element_size)
-                e = int((rm_size_B -((self.train_exp_counter)*r*element_size)) // element_size)
-                remove_elements = True
+        self.cur_acts = self.cur_acts.detach().cpu()
+        self.cur_acts_y = self.cur_acts_y.detach().cpu()
 
         # Sample e random patterns from the current experience
-        idxs_cur = torch.randperm(self.cur_acts.size(0))[:e]
+        idxs_cur = torch.randperm(self.cur_acts.size(0))[:self.h]
 
         # Get the corresponding labels
         rm_add_y = torch.tensor([self.cur_acts_y[idx_cur].item() for idx_cur in idxs_cur])
@@ -449,21 +457,17 @@ class LatentReplay(BaseStrategy):
 
         if self.train_exp_counter == 0:
             self.rm = {exp.current_experience: rm_add}
-        elif not remove_elements:
+        elif not self.remove_elements:
                 self.rm[exp.current_experience] = rm_add
         else:
             for value in self.rm.values():
                 perm = torch.randperm(value[0].size(0))
-                value[0] = value[0][perm][0:r]
-                value[1] = value[1][perm][0:r]
+                value[0] = value[0][perm][0:self.r]
+                value[1] = value[1][perm][0:self.r]
             self.rm[exp.current_experience] = rm_add
 
         self.cur_acts = None
-        del self.cur_acts
-        torch.cuda.empty_cache()
         self.cur_acts_y = None
-        del self.cur_acts_y
-        torch.cuda.empty_cache()
 
     def get_tensor_size(self, tensor):
         """ Return the size of a tensor in bytes."""
