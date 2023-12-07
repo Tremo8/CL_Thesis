@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader
 
 from avalanche.benchmarks.utils.data_loader import ReplayDataLoader
 from avalanche.training.storage_policy import ClassBalancedBuffer
@@ -89,7 +89,7 @@ class Replay(BaseStrategy):
         
         return dataloader
 
-    def train(self, dataset, test_data = None, plotting = False):
+    def train(self, dataset, test_data = None):
         """
         Training loop. If test data loader is provided, it will be used to test the model.
         
@@ -106,8 +106,6 @@ class Replay(BaseStrategy):
             if self.split_ratio != 0:
                 train_dataset, val_dataset = utils.split_dataset(exp.dataset, split_ratio=self.split_ratio)
                 train_dataset, val_dataset = classification_subset(dataset=exp.dataset, indices=train_dataset.indices), classification_subset(dataset=exp.dataset, indices=val_dataset.indices)
-                print("Train dataset size: ", len(train_dataset))
-                print("Validation dataset size: ", len(val_dataset))
                 val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True, num_workers=8)
             else:
                 train_dataset = exp.dataset
@@ -125,11 +123,6 @@ class Replay(BaseStrategy):
 
         if self.path is not None:
             torch.save(self.model.state_dict(), self.path)
-
-        if plotting:
-            plotter = utils.TaskAccuracyPlotter()
-            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-            plotter.show_figures() 
 
     def test(self, dataset):
         """

@@ -17,19 +17,14 @@ class PhiNetV1(nn.Module):
     """PhiNet implementation. This model
     can be instantiated from a pretrained network."""
 
-    def __init__(self, model, latent_layer_num = 0, out_features = 10, replace_bn_with_brn = False, device = "cpu",):
+    def __init__(self, model, latent_layer_num = 0, out_features = 10):
         """
-        Initialize the model.
+        Init.
 
-        :param pretrained: Path to the pretrained model.
-        :param input_shape: Shape of the input data.
-        :param alpha: Alpha parameter for the PhiNetConvBlock.
-        :param beta: Beta parameter for the PhiNetConvBlock.
-        :param t_zero: t_zero parameter for the PhiNetConvBlock.
-        :param num_layers: Number of PhiNetConvBlocks in the model.
-        :param latent_layer_num: Number of layers to keep as latent layers.
-        :param device: Device to use for the model.
-    
+        Args:
+            model: PyTorch model.
+            latent_layer_num: number of layers to be considered as latent.
+            out_features: number of output features.    
         """
            
         super().__init__()
@@ -53,6 +48,18 @@ class PhiNetV1(nn.Module):
         
 
     def forward(self, x, latent_input=None, return_lat_acts=False):
+        """
+        Forward pass.
+
+        Args:
+            x: input.
+            latent_input: latent input.
+            return_lat_acts: flag to return the latent activations.
+
+        Returns:
+            logits: output of the model.
+            orig_acts: latent activations.
+        """
 
         orig_acts=x
         if latent_input is not None:

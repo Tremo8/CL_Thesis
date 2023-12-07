@@ -40,9 +40,6 @@ class BaseStrategy():
 
         self.eval_mb_size = train_mb_size if eval_mb_size is None else eval_mb_size
 
-        # JointTraining can be trained only once.
-        self._is_fitted = False
-
         self.device = torch.device(device)
         """ PyTorch device where the model will be allocated. """
 

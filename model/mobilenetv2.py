@@ -17,10 +17,13 @@ class MobilenetV2(nn.Module):
     """MobileNet v1 implementation. This model
     can be instantiated from a pretrained network."""
 
-    def __init__(self, model, latent_layer_num=20):
+    def __init__(self, model, latent_layer_num=20,  out_features = 10):
         """
-        :param pretrained: boolean indicating whether to load pretrained weights
-        :parm latent_layer_num: determines the number of layers to consider as latent layers
+        Init.
+
+        Args:
+            model: PyTorch model.
+            latent_layer_num: number of layers to be considered as latent.
         """
         super().__init__()
 
@@ -43,10 +46,22 @@ class MobilenetV2(nn.Module):
 
         self.output = conv1x1(
             in_channels=1280,
-            out_channels=10,
+            out_channels=out_features,
             bias=False)
 
     def forward(self, x, latent_input=None, return_lat_acts=False):
+        """
+        Forward pass.
+
+        Args:
+            x: input.
+            latent_input: latent input.
+            return_lat_acts: flag to return the latent activations.
+
+        Returns:
+            logits: output of the model.
+            orig_acts: latent activations.
+        """
 
         if latent_input is not None:
             with torch.no_grad():

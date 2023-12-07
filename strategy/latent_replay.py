@@ -6,7 +6,6 @@ from utility.memory_computation import total_size
 from utility.CSVsave import save_results_to_csv
 import utility.utils as utils
 import sys
-from torchinfo import summary
 import numpy as np
 
 class LatentReplay(BaseStrategy):
@@ -34,6 +33,7 @@ class LatentReplay(BaseStrategy):
             split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            file_name: name of the file where to save the results.
             path: path to save the model.
         """
 
@@ -126,7 +126,7 @@ class LatentReplay(BaseStrategy):
 
         return dataloader
 
-    def train(self, dataset, test_data = None, plotting = False):
+    def train(self, dataset, test_data = None):
         """
         Training loop over the experiences.
 
@@ -500,35 +500,3 @@ class LatentReplay(BaseStrategy):
         exps_acc, avg_acc = super().test(dataset)
             
         return exps_acc, avg_acc
-
-    def _after_training_exp(self, exp):
-        # Number of patterns to add to the random memory
-        h = min(
-            self.rm_size // (self.train_exp_counter + 1),
-            self.cur_acts.size(0),
-        )
-        # Get the current experience
-        curr_data = exp.dataset
-
-        # Sample h random patterns from the current experience
-        idxs_cur = torch.randperm(self.cur_acts.size(0))[:h]
-        
-        # Get the corresponding labels
-        rm_add_y = torch.tensor(
-            [curr_data.targets[idx_cur] for idx_cur in idxs_cur]
-        )
-        # Concatenate the latent activations and the labels
-        rm_add = [self.cur_acts[idxs_cur], rm_add_y]
-
-        # replace patterns in random memory
-        if self.train_exp_counter == 0:
-            self.rm = rm_add
-        else:
-            # Sample h random patterns from memory to be removed
-            idxs_2_replace = torch.randperm(self.rm[0].size(0))[:h]
-            for j, idx in enumerate(idxs_2_replace):
-                idx = int(idx)
-                self.rm[0][idx] = rm_add[0][j]
-                self.rm[1][idx] = rm_add[1][j]
-
-        self.cur_acts = None

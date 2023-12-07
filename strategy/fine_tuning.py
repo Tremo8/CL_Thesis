@@ -20,6 +20,7 @@ class FineTuning(BaseStrategy):
             split_ratio: ratio to split the dataset into training and validation. If 0, no early stopping is performed.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            file_name: name of the file where to save the results.
             path: path to save the model.
         """
         super().__init__(
@@ -38,7 +39,7 @@ class FineTuning(BaseStrategy):
 
         self.tasks_acc = {}
 
-    def train(self, dataset, test_data = None, plotting = False):
+    def train(self, dataset, test_data = None):
         """
         Training loop. If test data loader is provided, it will be used to test the model.
 
@@ -54,8 +55,6 @@ class FineTuning(BaseStrategy):
             # Create the dataloader
             if self.split_ratio != 0:
                 train_dataset, val_dataset = utils.split_dataset(exp.dataset, split_ratio=self.split_ratio)
-                print("Train dataset size: ", len(train_dataset))
-                print("Validation dataset size: ", len(val_dataset))
                 train_loader = DataLoader(train_dataset, batch_size=self.train_mb_size, shuffle=True)
                 val_loader = DataLoader(val_dataset, batch_size=self.eval_mb_size, shuffle=True)
             else:
@@ -73,12 +72,6 @@ class FineTuning(BaseStrategy):
         
         if self.path is not None:
             torch.save(self.model.state_dict(), self.path)
-
-        # Plotting
-        if plotting:
-            plotter = utils.TaskAccuracyPlotter()
-            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-            plotter.show_figures()
 
     def test(self, dataset):
         """

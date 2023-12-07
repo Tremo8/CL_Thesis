@@ -18,6 +18,7 @@ class JointTraining(BaseStrategy):
             split_ratio: ratio to split the dataset into training and validation.  If 0, no early stopping is performed.
             patience: patience for early stopping.
             device: PyTorch device where the model will be allocated.
+            file_name: name of the file where to save the results.
             path: path to save the model.
         """
         super().__init__(
@@ -34,7 +35,7 @@ class JointTraining(BaseStrategy):
             path = path
         )
 
-    def train(self, dataset, test_data = None, plotting = False):
+    def train(self, dataset, test_data = None):
         """
         Training loop. If test data loader is provided, it will be used to test the model.
 
@@ -72,11 +73,6 @@ class JointTraining(BaseStrategy):
         
         if self.path is not None:
             torch.save(self.model.state_dict(), self.path)
-
-        if plotting:
-            plotter = utils.TaskAccuracyPlotter()
-            _ = plotter.plot_task_accuracy(self.tasks_acc, plot_task_acc=True, plot_avg_acc=True, plot_encountered_avg=True)
-            plotter.show_figures()
             
     def test(self, dataset):
         """Test the model on the given dataset.
