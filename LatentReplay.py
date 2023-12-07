@@ -7,7 +7,6 @@ import torchvision
 import torchvision.transforms as transforms
 
 import warnings
-
 # Filter out the specific UserWarning you want to suppress
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision.transforms.functional")
 
@@ -15,7 +14,6 @@ from strategy.latent_replay import LatentReplay
 from utility.CSVsave import save_results_to_csv
 from utility.utils import benchmark_selction, model_selection
 
-# Define other necessary variables or imports
 criterion = torch.nn.CrossEntropyLoss()  # Define your criterion
 
 def parse_args():
@@ -36,22 +34,17 @@ def parse_args():
     return args
 
 def main():
+    # Parse command line arguments
     args = parse_args()
+
+    # Create directory structure for saving results
     os.makedirs(f"results/{args.model_name}/{args.benchmark_name}/Latent_Replay/latent_{args.latent_layer}/weight_decay_{args.weight_decay}", exist_ok=True) 
 
+    # Define file paths for saving CSV and model checkpoints
     file_name = f"results/{args.model_name}/{args.benchmark_name}/Latent_Replay/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.csv"
     model_name = f"results/{args.model_name}/{args.benchmark_name}/Latent_Replay/latent_{args.latent_layer}/weight_decay_{args.weight_decay}/lr_{args.lr}_epochs_{args.train_epochs}_rm_MB_{args.rm_size_MB}_rm_{args.rm_size}_split_{args.split_ratio}.pth"
-   
-    print(f"model_name: {args.model_name}")
-    print(f"benchmark_name: {args.benchmark_name}")
-    print(f"lr: {args.lr}")
-    print(f"latent layer: {args.latent_layer}")
-    print(f"epochs: {args.train_epochs}")
-    print(f"rm_size_MB: {args.rm_size_MB}")
-    print(f"rm_size: {args.rm_size}")
-    print(f"weight_decay: {args.weight_decay}")
-    print(f"split_ratio: {args.split_ratio}")
 
+    # Save setup information to CSV file
     if file_name is not None:  
         setup = [
             ["Learning Rate", "Latent Layer", "Epochs", "Memory MB", "Memory Elements","Weight Decay", "Split Ratio"],
@@ -59,34 +52,32 @@ def main():
         ]
         save_results_to_csv(setup, file_name)
     
-    # PyTorch modules
+    # Define image transformations
     transform = transforms.Compose([
         torchvision.transforms.ToTensor(),
         torchvision.transforms.Resize((224, 224)),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
     
+    # Select the benchmark
     benchmark = benchmark_selction(args.benchmark_name, n_experiences=5, seed=0, return_task_id=True, train_transform=transform, eval_transform=transform)
 
-    # recovering the train and test streams
+    # Recover the train and test streams
     train_stream = benchmark.train_stream
     test_stream = benchmark.test_stream
 
-    eval_mb_size = 16  # Define eval_mb_size
-
-    # Set the current device to the GPU:index
-    #torch.cuda.set_device(args.device) if torch.cuda.is_available() else None
+    eval_mb_size = 128  # Define eval_mb_size
 
     # Set the device as cuda, the GPU specified as default will be used
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
-    print(f"Device: {device}") 
     
     torch.manual_seed(0)
 
-    # Your code
+    # Define the model and the optimizer
     model = model_selection(name = args.model_name, latent_layer=args.latent_layer, pretrained=True).to(device)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
+    # Define the strategy
     latent_replay = LatentReplay(
         model=model,
         optimizer=optimizer,
@@ -105,7 +96,8 @@ def main():
         path = model_name
     )
 
-    latent_replay.train(train_stream, test_stream, plotting=False)
+    # Train the model
+    latent_replay.train(train_stream, test_stream)
 
 if __name__ == "__main__":
     main()
