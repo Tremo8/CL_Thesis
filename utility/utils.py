@@ -75,32 +75,32 @@ def model_selection(name, latent_layer, pretrained=True):
         return model
     elif name == 'phinet_2.3_0.75_5':
         model = PhiNet(input_shape=(3,224,224), alpha = 2.3, beta = 0.75, t_zero = 5, include_top = True,num_classes = 1000, divisor = 8)
-        model.load_state_dict(torch.load('./new_phinet_small_71.pth.tar')["state_dict"])
+        model.load_state_dict(torch.load('./model/Pretrained/new_phinet_small_71.pth.tar')["state_dict"])
         model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     elif name == 'phinet_1.2_0.5_6_downsampling':
         model = PhiNet(input_shape=(3,224,224), num_layers=7, alpha = 1.2, beta = 0.5, t_zero = 6, downsampling_layers=[4,5,7], include_top = True,num_classes = 1000, divisor = 8)
-        model.load_state_dict(torch.load('./new_phinet_divisor8_v2_downsampl.pth.tar')["state_dict"])
+        model.load_state_dict(torch.load('./model/Pretrained/new_phinet_divisor8_v2_downsampl.pth.tar')["state_dict"])
         model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     elif name == 'phinet_0.8_0.75_8_downsampling':
         model = PhiNet(input_shape=(3,224,224), num_layers=7, alpha = 0.8, beta = 0.75, t_zero = 8, downsampling_layers=[4,5,7], include_top = True,num_classes = 1000, divisor = 8)
-        model.load_state_dict(torch.load('./new_phinet_divisor8_v3.pth.tar')["state_dict"])
+        model.load_state_dict(torch.load('./model/Pretrained/new_phinet_divisor8_v3.pth.tar')["state_dict"])
         model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     elif name == 'phinet_1.3_0.5_7_downsampling':
         model = PhiNet(input_shape=(3,224,224), num_layers=7, alpha = 1.3, beta = 0.5, t_zero = 7, downsampling_layers=[4,5,7], include_top = True,num_classes = 1000, divisor = 8)
-        model.load_state_dict(torch.load('./phinet_13057DS.pth.tar')["state_dict"])
+        model.load_state_dict(torch.load('./model/Pretrained/phinet_13057DS.pth.tar')["state_dict"])
         model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     elif name == 'phinet_0.9_0.5_4_downsampling_deep':
         model = PhiNet(input_shape=(3,224,224), num_layers=9, alpha = 0.9, beta = 0.5, t_zero = 4, downsampling_layers=[4,5,7], include_top = True,num_classes = 1000, divisor = 8)
-        model.load_state_dict(torch.load('./phinet_09054DSDE.pth.tar')["state_dict"])
+        model.load_state_dict(torch.load('./model/Pretrained/phinet_09054DSDE.pth.tar')["state_dict"])
         model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     elif name == 'phinet_0.9_0.5_4_downsampling':
         model = PhiNet(input_shape=(3,224,224), num_layers=7, alpha = 0.9, beta = 0.5, t_zero = 4, downsampling_layers=[4,5,7], include_top = True,num_classes = 1000, divisor = 8)
-        model.load_state_dict(torch.load('./phinet_09054DS.pth.tar')["state_dict"])
+        model.load_state_dict(torch.load('./model/Pretrained/phinet_09054DS.pth.tar')["state_dict"])
         model = PhiNetV1(model=model, latent_layer_num=latent_layer)
         return model
     else:
