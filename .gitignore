@@ -4,9 +4,6 @@ results
 testing
 training
 
-# Ignore model checkpoint files
-*.pth.tar
-
 # Ignore Jupyter Notebook
 Model_Test.ipynb
 load_phinet.py
